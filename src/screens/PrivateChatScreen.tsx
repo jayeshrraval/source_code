@@ -30,16 +30,22 @@ export default function PrivateChatScreen() {
     if (roomId) {
       fetchChatDetails();
       
+      // ✅ મજબૂત રીઅલ-ટાઇમ લિસનર (ફિલ્ટર વગર જેથી મેસેજ મિસ ના થાય)
       const messageChannel = supabase
-        .channel(`room_messages_${roomId}`)
+        .channel(`room_${roomId}`)
         .on('postgres_changes', { 
-          event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages' 
         }, (payload) => {
-          setMessages((prev) => {
-            if (prev.find(m => m.id === payload.new.id)) return prev;
-            return [...prev, payload.new];
-          });
-          setTimeout(scrollToBottom, 100);
+          // કોડ લેવલ પર રૂમ આઈડી ચેક કરો
+          if (payload.new.room_id === roomId) {
+            setMessages((prev) => {
+              if (prev.find(m => m.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+            setTimeout(scrollToBottom, 100);
+          }
         })
         .subscribe();
 
@@ -110,11 +116,11 @@ export default function PrivateChatScreen() {
     setNewMessage('');
     setShowEmojiPicker(false); // મેસેજ જાય એટલે ઈમોજી બંધ
 
-    // ✅ ફિક્સ: receiver_id ઉમેર્યો છે જેથી સામેવાળાને મેસેજ મળે
+    // ✅ ફિક્સ: receiver_id અને room_id બંને પ્રોપર જશે
     const { error } = await supabase.from('messages').insert([{
       room_id: roomId, 
       sender_id: currentUserId, 
-      receiver_id: otherUser.id, // 👈 આ લાઈન એડ કરી છે
+      receiver_id: otherUser.id, 
       content: tempMessage
     }]);
 
