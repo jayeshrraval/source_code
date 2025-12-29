@@ -135,10 +135,12 @@ export default function RequestsScreen() {
     }
   };
 
+  // ✅ સુધારેલું લોજિક: જો રૂમ ન હોય તો બનાવીને Redirect કરશે
   const handleStartChat = async (otherId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if(!user) return;
 
+    // ૧. પહેલા રૂમ શોધો
     const { data: room } = await supabase
         .from('chat_rooms')
         .select('id')
@@ -147,9 +149,21 @@ export default function RequestsScreen() {
         .maybeSingle();
 
     if (room) {
+        // ૨. જો રૂમ મળી જાય તો નેવિગેટ કરો
         navigate(`/private-chat/${room.id}`);
     } else {
-        alert("ચેટ કનેક્શન મળી રહ્યું નથી.");
+        // ૩. જો રૂમ ન હોય, તો બનાવીને જ અંદર મોકલો (Blank screen કે Error નહીં આવે)
+        const { data: newRoom } = await supabase
+            .from('chat_rooms')
+            .insert([{ type: 'matrimony', participant_ids: [user.id, otherId] }])
+            .select()
+            .single();
+            
+        if (newRoom) {
+            navigate(`/private-chat/${newRoom.id}`);
+        } else {
+            alert("ચેટ શરૂ કરવામાં ભૂલ છે. ફરી પ્રયાસ કરો.");
+        }
     }
   };
 
