@@ -105,13 +105,17 @@ export default function PrivateChatScreen() {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !currentUserId || !roomId) return;
+    if (!newMessage.trim() || !currentUserId || !roomId || !otherUser.id) return;
     const tempMessage = newMessage;
     setNewMessage('');
     setShowEmojiPicker(false); // મેસેજ જાય એટલે ઈમોજી બંધ
 
+    // ✅ ફિક્સ: receiver_id ઉમેર્યો છે જેથી સામેવાળાને મેસેજ મળે
     const { error } = await supabase.from('messages').insert([{
-      room_id: roomId, sender_id: currentUserId, content: tempMessage
+      room_id: roomId, 
+      sender_id: currentUserId, 
+      receiver_id: otherUser.id, // 👈 આ લાઈન એડ કરી છે
+      content: tempMessage
     }]);
 
     if (error) {
@@ -188,9 +192,8 @@ export default function PrivateChatScreen() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ✅ WhatsApp Style Input Area */}
+      {/* WhatsApp Style Input Area */}
       <div className="relative">
-        {/* ઈમોજી પિકર (જો ઓપન હોય તો) */}
         {showEmojiPicker && (
           <div className="absolute bottom-16 left-0 right-0 z-30">
             <EmojiPicker 
@@ -204,7 +207,6 @@ export default function PrivateChatScreen() {
 
         <div className="p-2 bg-[#efe7de] flex items-end space-x-2 safe-area-bottom z-40">
             <div className="flex-1 bg-white rounded-2xl flex items-center px-2 py-1 shadow-sm border border-gray-200 min-h-[45px]">
-                {/* સ્માઈલી આઈકન */}
                 <button 
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
                     className="p-1.5 text-gray-500 hover:text-gray-600 active:scale-90 transition-transform"
@@ -215,29 +217,27 @@ export default function PrivateChatScreen() {
                 <input
                     type="text"
                     value={newMessage}
-                    onClick={() => setShowEmojiPicker(false)} // ટાઈપ કરવા ક્લિક કરે તો ઈમોજી બંધ થાય
+                    onClick={() => setShowEmojiPicker(false)} 
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     placeholder="મેસેજ લખો..."
                     className="flex-1 py-2 px-2 outline-none text-[16px] bg-transparent"
                 />
 
-                {/* અટેચમેન્ટ અને કેમેરા આઈકન */}
                 <div className="flex items-center space-x-3 pr-2 text-gray-500">
                     <Paperclip size={20} className="cursor-pointer rotate-[-45deg]" />
                     {!newMessage && <Camera size={20} className="cursor-pointer" />}
                 </div>
             </div>
 
-            {/* માઈક અથવા સેન્ડ બટન */}
             <button
                 onClick={handleSendMessage}
                 className="w-12 h-12 bg-[#00897b] rounded-full flex items-center justify-center text-white shadow-md active:scale-90 transition-all"
             >
                 {newMessage.trim() ? (
-                    <Send size={20} className="ml-0.5" /> // જો લખ્યું હોય તો Send બતાવો
+                    <Send size={20} className="ml-0.5" /> 
                 ) : (
-                    <Mic size={20} /> // જો ખાલી હોય તો Mic બતાવો
+                    <Mic size={20} /> 
                 )}
             </button>
         </div>
