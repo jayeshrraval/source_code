@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Heart, Loader2, User, MapPin, Briefcase, GraduationCap, Camera, Bell, ArrowLeft, Users, Lock, CheckCircle } from 'lucide-react';
+import { Search, Heart, Loader2, User, MapPin, Briefcase, GraduationCap, Camera, Bell, ArrowLeft, Users, Lock, CheckCircle, Home } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
@@ -26,6 +26,9 @@ export default function MatrimonyScreen() {
     mother_name: '',
     peta_atak: '',
     mother_peta_atak: '',
+    nani_peta_atak: '', // ✅ New Added
+    dadi_peta_atak: '', // ✅ New Added
+    mosal_gam: '',      // ✅ New Added
     gol: '',
     age: '',
     marital_status: 'અપરિણીત',
@@ -64,7 +67,6 @@ export default function MatrimonyScreen() {
       }
 
       // ૨. લોગીન યુઝરનો મોબાઈલ નંબર મેળવો (ઈમેઈલ કે ફોન ગમે તેમાંથી)
-      // ✅ અપડેટ: આ લોજિક હવે ઈમેઈલમાંથી પણ નંબર શોધી લેશે
       let rawPhone = user.phone || user.email || user.user_metadata?.mobile_number || '';
       
       // ✅ પાવરફુલ ક્લીનિંગ: ફક્ત છેલ્લા ૧૦ આંકડા જ પકડશે
@@ -186,6 +188,12 @@ export default function MatrimonyScreen() {
   };
 
   const handleSaveProfile = async () => {
+      // ✅ મોસાળ ગામ ફરજિયાત ચેક
+      if (!formData.mosal_gam.trim()) {
+          alert('મોસાળ ગામ ભરવું ફરજિયાત છે!');
+          return;
+      }
+
       try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -339,6 +347,20 @@ export default function MatrimonyScreen() {
                         <input type="text" value={formData.mother_peta_atak} onChange={(e) => setFormData({...formData, mother_peta_atak: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-2xl font-bold text-gray-700 mt-1 shadow-inner border-none outline-none focus:ring-2 focus:ring-pink-500" placeholder="માતાની પેટા અટક લખો" />
                     </div>
 
+                    {/* ✅ New Added Fields */}
+                    <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">નાનીની પેટા અટક (Optional)</label>
+                        <input type="text" value={formData.nani_peta_atak} onChange={(e) => setFormData({...formData, nani_peta_atak: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-2xl font-bold text-gray-700 mt-1 shadow-inner border-none outline-none focus:ring-2 focus:ring-pink-500" placeholder="નાનીની અટક" />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">દાદીની પેટા અટક (Optional)</label>
+                        <input type="text" value={formData.dadi_peta_atak} onChange={(e) => setFormData({...formData, dadi_peta_atak: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-2xl font-bold text-gray-700 mt-1 shadow-inner border-none outline-none focus:ring-2 focus:ring-pink-500" placeholder="દાદીની અટક" />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">મોસાળ ગામ *</label>
+                        <input type="text" value={formData.mosal_gam} onChange={(e) => setFormData({...formData, mosal_gam: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-2xl font-bold text-gray-700 mt-1 shadow-inner border-none outline-none focus:ring-2 focus:ring-pink-500" placeholder="મોસાળ ગામ" />
+                    </div>
+
                     <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">ગોળ</label>
                         <input type="text" value={formData.gol} onChange={(e) => setFormData({...formData, gol: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-2xl font-bold text-gray-700 mt-1 shadow-inner border-none outline-none focus:ring-2 focus:ring-pink-500" placeholder="ગોળ લખો" />
@@ -392,7 +414,8 @@ export default function MatrimonyScreen() {
             {selectedProfile ? (
               <div className="bg-white rounded-[40px] p-6 shadow-xl border border-pink-50">
                 <div className="text-center mb-6">
-                  <div className="w-32 h-32 bg-pink-50 rounded-full mx-auto mb-4 border-4 border-white shadow-lg overflow-hidden flex items-center justify-center">
+                  {/* ✅ Big Photo: w-full h-96 */}
+                  <div className="w-full h-96 bg-pink-50 rounded-3xl mb-6 border-4 border-white shadow-lg overflow-hidden">
                     <img src={selectedProfile.image_url || 'https://ui-avatars.com/api/?name=User&background=random'} className="w-full h-full object-cover" />
                   </div>
                   <h2 className="text-2xl font-black text-gray-800">{selectedProfile.full_name}</h2>
@@ -400,10 +423,20 @@ export default function MatrimonyScreen() {
                 </div>
                 <div className="grid grid-cols-2 gap-4 border-t pt-6">
                   <DetailRow icon={User} label="લગ્ન સ્થિતિ" value={selectedProfile.marital_status} />
+                  <DetailRow icon={User} label="ઉંમર" value={`${selectedProfile.age} વર્ષ`} />
                   <DetailRow icon={MapPin} label="ગામ" value={selectedProfile.village} />
+                  <DetailRow icon={MapPin} label="તાલુકો" value={selectedProfile.taluka} />
+                  <DetailRow icon={MapPin} label="જીલ્લો" value={selectedProfile.district} />
                   <DetailRow icon={Briefcase} label="ધંધો" value={selectedProfile.occupation} />
                   <DetailRow icon={GraduationCap} label="શિક્ષણ" value={selectedProfile.education} />
                   <DetailRow icon={Heart} label="ગોળ" value={selectedProfile.gol} />
+                  
+                  {/* ✅ New Details Shown */}
+                  <DetailRow icon={Home} label="મોસાળ ગામ" value={selectedProfile.mosal_gam} />
+                  <DetailRow icon={User} label="માતાનું નામ" value={selectedProfile.mother_name} />
+                  <DetailRow icon={User} label="માતાની અટક" value={selectedProfile.mother_peta_atak} />
+                  {selectedProfile.nani_peta_atak && <DetailRow icon={User} label="નાનીની અટક" value={selectedProfile.nani_peta_atak} />}
+                  {selectedProfile.dadi_peta_atak && <DetailRow icon={User} label="દાદીની અટક" value={selectedProfile.dadi_peta_atak} />}
                 </div>
                 <button onClick={() => handleSendRequest(selectedProfile.user_id)} className="w-full mt-6 bg-pink-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest">રિક્વેસ્ટ મોકલો</button>
               </div>
