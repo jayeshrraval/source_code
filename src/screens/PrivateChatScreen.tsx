@@ -5,7 +5,7 @@ import {
   Smile, Paperclip, Mic, Camera, Send 
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import EmojiPicker from 'emoji-picker-react'; // ✅ ઈમોજી માટે આ લાઈબ્રેરી વાપરી છે
+import EmojiPicker from 'emoji-picker-react';
 
 export default function PrivateChatScreen() {
   const { roomId } = useParams();
@@ -16,8 +16,6 @@ export default function PrivateChatScreen() {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [otherUser, setOtherUser] = useState({ id: '', name: '', image: '' });
   const [isOnline, setIsOnline] = useState(false);
-  
-  // ✅ નવા સ્ટેટ: ઈમોજી પિકર માટે
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const messagesEndRef = useRef(null);
@@ -30,25 +28,42 @@ export default function PrivateChatScreen() {
     if (roomId) {
       fetchChatDetails();
       
-      // ✅ મજબૂત રીઅલ-ટાઇમ લિસનર (ફિલ્ટર વગર જેથી મેસેજ મિસ ના થાય)
-      const messageChannel = supabase
-        .channel(`room_${roomId}`)
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages' 
-        }, (payload) => {
-          // કોડ લેવલ પર રૂમ આઈડી ચેક કરો
-          if (payload.new.room_id === roomId) {
-            setMessages((prev) => {
-              if (prev.find(m => m.id === payload.new.id)) return prev;
-              return [...prev, payload.new];
-            });
-            setTimeout(scrollToBottom, 100);
-          }
-        })
-        .subscribe();
+      console.log("🔌 Connecting to Realtime for Room:", roomId);
 
+      // 1. જૂના કનેક્શન સાફ કરો (જેથી ડબલ મેસેજ ન આવે)
+      supabase.removeAllChannels();
+
+      // 2. નવું મજબૂત કનેક્શન
+      const messageChannel = supabase
+        .channel(`room_${roomId}`) // યુનિક ચેનલ નામ
+        .on(
+          'postgres_changes', 
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages' 
+          }, 
+          (payload) => {
+            console.log("🔥 નવો મેસેજ પકડાયો (Payload):", payload); // જાસૂસ
+
+            // રૂમ ID ચેક કરો (સુરક્ષા માટે)
+            if (payload.new.room_id === roomId) {
+              setMessages((prev) => {
+                // ડુપ્લિકેટ મેસેજ રોકો
+                if (prev.find(m => m.id === payload.new.id)) return prev;
+                return [...prev, payload.new];
+              });
+              setTimeout(scrollToBottom, 100);
+            } else {
+              console.log("⚠️ મેસેજ આવ્યો પણ બીજા રૂમનો હતો:", payload.new.room_id);
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log("📡 Connection Status:", status); // જાસૂસ
+        });
+
+      // 3. ઓનલાઇન સ્ટેટસ માટે Presence ચેનલ
       const presenceChannel = supabase.channel(`presence_${roomId}`, {
         config: { presence: { key: currentUserId || 'anon' } }
       });
@@ -86,19 +101,31 @@ export default function PrivateChatScreen() {
       if (!user) return;
       setCurrentUserId(user.id);
 
+      // રૂમની વિગતો મેળવો
       const { data: roomData } = await supabase.from('chat_rooms').select('participant_ids').eq('id', roomId).single();
 
       if (roomData) {
         const otherId = roomData.participant_ids.find((id) => id !== user.id);
         if (otherId) {
+          // સામેવાળા યુઝરની પ્રોફાઈલ (મેટ્રિમોની પ્રોફાઈલમાંથી)
           const { data: profile } = await supabase.from('matrimony_profiles').select('user_id, full_name, image_url').eq('user_id', otherId).single();
+          
           if (profile) {
-            setOtherUser({ id: profile.user_id, name: profile.full_name, image: profile.image_url || 'https://ui-avatars.com/api/?name=User&background=random' });
+            setOtherUser({ 
+              id: profile.user_id, 
+              name: profile.full_name, 
+              // ✅ UI Avatar Fix applied here automatically
+              image: profile.image_url || `https://ui-avatars.com/api/?name=${profile.full_name}&background=random` 
+            });
           }
         }
       }
 
-      const { data: msgs } = await supabase.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
+      // જૂના મેસેજ લોડ કરો
+      const { data: msgs, error } = await supabase.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
+      
+      if (error) console.error("Error fetching messages:", error);
+      
       if (msgs) {
         setMessages(msgs);
         setTimeout(scrollToBottom, 300);
@@ -114,9 +141,9 @@ export default function PrivateChatScreen() {
     if (!newMessage.trim() || !currentUserId || !roomId || !otherUser.id) return;
     const tempMessage = newMessage;
     setNewMessage('');
-    setShowEmojiPicker(false); // મેસેજ જાય એટલે ઈમોજી બંધ
+    setShowEmojiPicker(false);
 
-    // ✅ ફિક્સ: receiver_id અને room_id બંને પ્રોપર જશે
+    // ✅ મેસેજ ઇન્સર્ટ કરો
     const { error } = await supabase.from('messages').insert([{
       room_id: roomId, 
       sender_id: currentUserId, 
@@ -125,12 +152,12 @@ export default function PrivateChatScreen() {
     }]);
 
     if (error) {
+      console.error("Message Send Error:", error);
       alert('મેસેજ મોકલી શકાયો નથી.');
       setNewMessage(tempMessage);
     }
   };
 
-  // ✅ ઈમોજી ક્લિક હેન્ડલર
   const onEmojiClick = (emojiObject) => {
     setNewMessage((prev) => prev + emojiObject.emoji);
   };
@@ -146,7 +173,7 @@ export default function PrivateChatScreen() {
           
           <div className="relative">
             <img 
-              src={otherUser?.image} 
+              src={otherUser?.image || 'https://ui-avatars.com/api/?name=User&background=random'} 
               className="w-10 h-10 rounded-full object-cover border border-white/20"
               alt="User"
             />
@@ -181,8 +208,8 @@ export default function PrivateChatScreen() {
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1`}>
                 <div className={`relative px-3 py-1.5 rounded-lg shadow-sm max-w-[85%] text-[15px] ${
-                    isMe ? 'bg-[#dcf8c6] text-gray-800 rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none'
-                  }`}>
+                  isMe ? 'bg-[#dcf8c6] text-gray-800 rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none'
+                }`}>
                   <p className="pr-12 pb-1">{msg.content}</p>
                   <div className="flex items-center justify-end space-x-1 -mt-1">
                     <span className="text-[10px] text-gray-500 uppercase">
