@@ -393,7 +393,7 @@ export default function MatrimonyScreen() {
               <div className="bg-white rounded-[40px] p-6 shadow-xl border border-pink-50">
                 <div className="text-center mb-6">
                   <div className="w-32 h-32 bg-pink-50 rounded-full mx-auto mb-4 border-4 border-white shadow-lg overflow-hidden flex items-center justify-center">
-                    <img src={selectedProfile.image_url || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
+                    <img src={selectedProfile.image_url || 'https://ui-avatars.com/api/?name=User&background=random'} className="w-full h-full object-cover" />
                   </div>
                   <h2 className="text-2xl font-black text-gray-800">{selectedProfile.full_name}</h2>
                   <p className="text-pink-500 font-bold uppercase text-xs tracking-widest">{selectedProfile.peta_atak}</p>

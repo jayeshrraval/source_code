@@ -93,7 +93,7 @@ export default function PrivateChatScreen() {
         if (otherId) {
           const { data: profile } = await supabase.from('matrimony_profiles').select('user_id, full_name, image_url').eq('user_id', otherId).single();
           if (profile) {
-            setOtherUser({ id: profile.user_id, name: profile.full_name, image: profile.image_url || 'https://via.placeholder.com/100' });
+            setOtherUser({ id: profile.user_id, name: profile.full_name, image: profile.image_url || 'https://ui-avatars.com/api/?name=User&background=random' });
           }
         }
       }
