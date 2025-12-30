@@ -3,7 +3,7 @@ import { Send, Bot, User, Loader2, ArrowLeft, Trash2, History } from 'lucide-rea
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
-import { supabase } from '../lib/supabase'; //
+import { supabase } from '../supabaseClient'; //
 
 export default function AIAssistantScreen() {
   const navigate = useNavigate();

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from './lib/supabase';
+import { supabase } from './supabaseClient';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
 import SplashScreen from './screens/SplashScreen';
