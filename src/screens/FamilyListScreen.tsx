@@ -8,16 +8,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import BottomNav from '../components/BottomNav';
 
-const PAGE_SIZE = 20; // ✅ એક વખતમાં ૨૦ રેકોર્ડ આવશે
+const PAGE_SIZE = 20;
 
 export default function FamilyListScreen() {
   const navigate = useNavigate();
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [userMobile, setUserMobile] = useState(null);
   
-  // ✅ નવા ઉમેરેલા State (Pagination માટે)
+  // ✅ સિક્યુરિટી માટે યુઝર ID અને મોબાઈલ બંને જોઈએ
+  const [userMobile, setUserMobile] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -26,38 +28,32 @@ export default function FamilyListScreen() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        let mobile = user.phone || user.user_metadata?.mobile_number || '';
+        // ✅ 1. યુઝર ID સેવ કરો (Creator Check માટે)
+        setCurrentUserId(user.id);
+
+        // ✅ 2. મોબાઈલ નંબર ફોર્મેટ કરો (Member Check માટે)
+        let mobile = user.phone || user.email || user.user_metadata?.mobile_number || '';
         mobile = mobile.replace(/[^0-9]/g, '').slice(-10);
         setUserMobile(mobile);
       }
-      fetchFamilies(0); // ✅ શરૂઆતમાં પહેલું પેજ (0) મંગાવો
+      fetchFamilies(0);
     };
     init();
 
-    // ✅ સ્ક્રોલ લિસનર (જ્યારે યુઝર નીચે પહોંચે ત્યારે નવો ડેટા લાવે)
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // ✅ સ્ક્રોલ થાય ત્યારે આ ફંક્શન ચાલે
   const handleScroll = () => {
-    if (
-      window.innerHeight + document.documentElement.scrollTop + 1 >= document.documentElement.scrollHeight ||
-      loading
-    ) {
-      // જો યુઝર છેક નીચે પહોંચી જાય તો જ નવો ડેટા મંગાવો
-      // અહીં આપણે ચેક કરીશું કે હજુ ડેટા લાવવાનો બાકી છે કે નહિ
-    }
+    // Scroll Logic Placeholder if needed explicitly
   };
 
-  // ✅ Infinite Scroll માટે useEffect જે page બદલાય ત્યારે કોલ કરે
   useEffect(() => {
     if (page > 0) {
       fetchFamilies(page);
     }
   }, [page]);
 
-  // ✅ સ્ક્રીન નીચે અડે ત્યારે પેજ નંબર વધારવાનું લોજીક
   const onScroll = () => {
     if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100 && hasMore && !isFetchingMore) {
       setPage((prevPage) => prevPage + 1);
@@ -75,7 +71,6 @@ export default function FamilyListScreen() {
       if (pageNumber === 0) setLoading(true);
       else setIsFetchingMore(true);
 
-      // ✅ ગણિત: ક્યાંથી ક્યાં સુધીનો ડેટા લાવવો
       const from = pageNumber * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
@@ -83,11 +78,10 @@ export default function FamilyListScreen() {
         .from('families')
         .select('*')
         .order('created_at', { ascending: false })
-        .range(from, to); // ✅ સુપાબેઝને કહીએ છીએ કે ટુકડામાં ડેટા આપ
+        .range(from, to);
 
       if (error) throw error;
 
-      // ડેટા ખલાસ થઈ ગયો હોય તો બંધ કરો
       if (data.length < PAGE_SIZE) {
         setHasMore(false);
       }
@@ -97,6 +91,8 @@ export default function FamilyListScreen() {
         if (!acc[key]) {
           acc[key] = {
             id: curr.id,
+            // ✅ user_id સાચવવું જરૂરી છે જેથી ખબર પડે કોણે બનાવ્યું
+            user_id: curr.user_id, 
             head_name: curr.head_name,
             sub_surname: curr.sub_surname,
             village: curr.village,
@@ -111,7 +107,6 @@ export default function FamilyListScreen() {
 
       const newFamilies = Object.values(grouped);
 
-      // ✅ જો પહેલું પેજ હોય તો રિપ્લેસ કરો, નહીંતર જૂનામાં નવું ઉમેરો (Append)
       if (pageNumber === 0) {
         setFamilies(newFamilies);
       } else {
@@ -131,7 +126,6 @@ export default function FamilyListScreen() {
       const { error } = await supabase.from('families').delete().eq('id', memberId);
       if (error) alert(error.message);
       else {
-        // ડિલીટ કર્યા પછી લિસ્ટ રિફ્રેશ કરવા માટે (અત્યારે સાદી રીતે પેજ 0 લાવીએ)
         setPage(0);
         fetchFamilies(0); 
       }
@@ -184,11 +178,23 @@ export default function FamilyListScreen() {
           <div className="space-y-6">
             <AnimatePresence>
               {filteredFamilies.map((family, index) => {
-                const isMyFamily = family.members.some(m => 
-                  m.member_mobile === userMobile || m.mobile_number === userMobile
+                
+                // ✅ SECURITY LOGIC: આ પરિવારમાં એડિટ કરવાનો હક કોને છે?
+                
+                // ૧. જો યુઝરે પોતે બનાવ્યું હોય (Creator)
+                const isCreator = family.user_id === currentUserId;
+
+                // ૨. જો યુઝર પોતે હેડ હોય (Head Mobile Match)
+                const isHead = family.mobile_number && family.mobile_number.replace(/[^0-9]/g, '').slice(-10) === userMobile;
+
+                // ૩. જો યુઝર આ પરિવારનો સભ્ય હોય (Member Mobile Match)
+                const isFamilyMember = family.members.some(m => 
+                  m.member_mobile && m.member_mobile.replace(/[^0-9]/g, '').slice(-10) === userMobile
                 );
 
-                // કી યુનિક રાખવા માટે index નો ઉપયોગ (જો કદાચ ડુપ્લીકેટ આવે તો એરર ના આવે)
+                // જો આમાંથી એક પણ સાચું હોય, તો જ બટન દેખાડો
+                const canEdit = isCreator || isHead || isFamilyMember;
+
                 return (
                   <motion.div
                     key={`${family.id}-${index}`}
@@ -221,7 +227,8 @@ export default function FamilyListScreen() {
                             <p className="text-[10px] text-gray-400">{m.relationship} | {m.gender}</p>
                           </div>
                           
-                          {isMyFamily && (
+                          {/* ✅ ફક્ત permission હોય તો જ બટન દેખાડો */}
+                          {canEdit && (
                             <div className="flex gap-2">
                               <button onClick={() => removeMember(m.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors">
                                 <Trash2 size={16} />
@@ -239,7 +246,6 @@ export default function FamilyListScreen() {
               })}
             </AnimatePresence>
             
-            {/* ✅ નીચે ડેટા લોડ થાય ત્યારે લોડર બતાવવા માટે */}
             {isFetchingMore && (
               <div className="flex justify-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
