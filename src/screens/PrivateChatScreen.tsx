@@ -24,76 +24,72 @@ export default function PrivateChatScreen() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // ✅ 1. Realtime Subscription Effect (સુધારેલો)
   useEffect(() => {
-    if (roomId) {
-      fetchChatDetails();
-      
-      console.log("🔌 Connecting to Realtime for Room:", roomId);
+    // જ્યાં સુધી ID ન મળે ત્યાં સુધી કનેક્ટ ન કરો
+    if (!roomId || !currentUserId) return;
 
-      // 1. જૂના કનેક્શન સાફ કરો (જેથી ડબલ મેસેજ ન આવે)
-      supabase.removeAllChannels();
+    console.log("🔌 Connecting to Realtime for Room:", roomId);
 
-      // 2. નવું મજબૂત કનેક્શન
-      const messageChannel = supabase
-        .channel(`room_${roomId}`) // યુનિક ચેનલ નામ
-        .on(
-          'postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'messages' 
-          }, 
-          (payload) => {
-            console.log("🔥 નવો મેસેજ પકડાયો (Payload):", payload); // જાસૂસ
+    // ચેનલનું યુનિક નામ
+    const channelId = `room_chat_${roomId}`;
 
-            // રૂમ ID ચેક કરો (સુરક્ષા માટે)
-            if (payload.new.room_id === roomId) {
-              setMessages((prev) => {
-                // ડુપ્લિકેટ મેસેજ રોકો
-                if (prev.find(m => m.id === payload.new.id)) return prev;
-                return [...prev, payload.new];
-              });
-              setTimeout(scrollToBottom, 100);
-            } else {
-              console.log("⚠️ મેસેજ આવ્યો પણ બીજા રૂમનો હતો:", payload.new.room_id);
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log("📡 Connection Status:", status); // જાસૂસ
-        });
-
-      // 3. ઓનલાઇન સ્ટેટસ માટે Presence ચેનલ
-      const presenceChannel = supabase.channel(`presence_${roomId}`, {
-        config: { presence: { key: currentUserId || 'anon' } }
+    const messageChannel = supabase
+      .channel(channelId)
+      .on(
+        'postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `room_id=eq.${roomId}` // ✅ સર્વર સાઈડ ફિલ્ટર (મહત્વનું)
+        }, 
+        (payload) => {
+          console.log("🔥 નવો મેસેજ આવ્યો:", payload);
+          setMessages((prev) => {
+            if (prev.find(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+          setTimeout(scrollToBottom, 100);
+        }
+      )
+      .subscribe((status) => {
+        console.log("📡 Message Status:", status);
       });
 
-      presenceChannel
-        .on('presence', { event: 'sync' }, () => {
-          const state = presenceChannel.presenceState();
-          if (otherUser?.id) {
-            const onlineUsers = Object.keys(state);
-            setIsOnline(onlineUsers.includes(otherUser.id));
-          }
-        })
-        .on('presence', { event: 'join' }, ({ newPresences }) => {
-            if (newPresences.find((p) => p.presence_ref === otherUser?.id)) setIsOnline(true);
-        })
-        .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-            if (leftPresences.find((p) => p.presence_ref === otherUser?.id)) setIsOnline(false);
-        })
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED' && currentUserId) {
-            await presenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
-          }
-        });
+    // Presence Channel (Online Status)
+    const presenceChannel = supabase.channel(`presence_${roomId}`, {
+      config: { presence: { key: currentUserId } }
+    });
 
-      return () => {
-        supabase.removeChannel(messageChannel);
-        supabase.removeChannel(presenceChannel);
-      };
-    }
-  }, [roomId, currentUserId, otherUser?.id]);
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        if (otherUser?.id) {
+          // ચેક કરો કે સામેવાળો યુઝર લિસ્ટમાં છે કે નહીં
+          const isOnlineNow = Object.values(state).flat().some((u: any) => u.user_id === otherUser.id);
+          setIsOnline(isOnlineNow);
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
+        }
+      });
+
+    // ✅ સાચી સફાઈ: માત્ર આ જ ચેનલ બંધ કરો, આખી દુનિયાની નહીં
+    return () => {
+      console.log("🧹 Cleaning up...");
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(presenceChannel);
+    };
+
+  }, [roomId, currentUserId]); // otherUser ને અહીંથી કાઢી નાખ્યો જેથી વારંવાર રી-કનેક્ટ ન થાય
+
+  // ✅ 2. ડેટા લાવવા માટેનો અલગ Effect
+  useEffect(() => {
+    if (roomId) fetchChatDetails();
+  }, [roomId]);
 
   const fetchChatDetails = async () => {
     try {
@@ -101,31 +97,23 @@ export default function PrivateChatScreen() {
       if (!user) return;
       setCurrentUserId(user.id);
 
-      // રૂમની વિગતો મેળવો
       const { data: roomData } = await supabase.from('chat_rooms').select('participant_ids').eq('id', roomId).single();
 
       if (roomData) {
         const otherId = roomData.participant_ids.find((id) => id !== user.id);
         if (otherId) {
-          // સામેવાળા યુઝરની પ્રોફાઈલ (મેટ્રિમોની પ્રોફાઈલમાંથી)
           const { data: profile } = await supabase.from('matrimony_profiles').select('user_id, full_name, image_url').eq('user_id', otherId).single();
-          
           if (profile) {
             setOtherUser({ 
               id: profile.user_id, 
               name: profile.full_name, 
-              // ✅ UI Avatar Fix applied here automatically
               image: profile.image_url || `https://ui-avatars.com/api/?name=${profile.full_name}&background=random` 
             });
           }
         }
       }
 
-      // જૂના મેસેજ લોડ કરો
-      const { data: msgs, error } = await supabase.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
-      
-      if (error) console.error("Error fetching messages:", error);
-      
+      const { data: msgs } = await supabase.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
       if (msgs) {
         setMessages(msgs);
         setTimeout(scrollToBottom, 300);
@@ -143,7 +131,6 @@ export default function PrivateChatScreen() {
     setNewMessage('');
     setShowEmojiPicker(false);
 
-    // ✅ મેસેજ ઇન્સર્ટ કરો
     const { error } = await supabase.from('messages').insert([{
       room_id: roomId, 
       sender_id: currentUserId, 
@@ -164,7 +151,7 @@ export default function PrivateChatScreen() {
 
   return (
     <div className="h-screen flex flex-col font-gujarati bg-[#efe7de]">
-      {/* Header - WhatsApp Style */}
+      {/* Header */}
       <div className="bg-[#075e54] p-2 flex items-center justify-between safe-area-top shadow-md z-20">
         <div className="flex items-center space-x-2">
           <button onClick={() => navigate(-1)} className="p-1 text-white active:scale-90">
@@ -197,7 +184,7 @@ export default function PrivateChatScreen() {
         </div>
       </div>
 
-      {/* Chat Messages Area */}
+      {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2 relative" 
            style={{ backgroundImage: "url('https://i.pinimg.com/originals/ab/ab/60/abab60f06ab52fa727e78f20501f57df.png')", backgroundSize: 'contain' }}>
         {loading ? (
@@ -225,7 +212,7 @@ export default function PrivateChatScreen() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* WhatsApp Style Input Area */}
+      {/* Input Area */}
       <div className="relative">
         {showEmojiPicker && (
           <div className="absolute bottom-16 left-0 right-0 z-30">
