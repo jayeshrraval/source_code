@@ -31,7 +31,7 @@ export default function FamilyRegistrationScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [loadingData, setLoadingData] = useState(true); // ડેટા લોડિંગ સ્ટેટ
+  const [loadingData, setLoadingData] = useState(true);
 
   // ફોર્મ સ્ટેટ્સ
   const [headName, setHeadName] = useState('');
@@ -41,7 +41,7 @@ export default function FamilyRegistrationScreen() {
   const [village, setVillage] = useState('');
   const [taluko, setTaluko] = useState('');
   const [district, setDistrict] = useState('');
-  
+   
   const [members, setMembers] = useState<FamilyMember[]>([
     { id: Date.now().toString(), memberName: '', relationship: '', gender: '', memberMobile: '' },
   ]);
@@ -50,7 +50,6 @@ export default function FamilyRegistrationScreen() {
     loadExistingFamily();
   }, []);
 
-  // ✅ ફોર્મ રીસેટ ફંક્શન (જ્યારે નવો યુઝર હોય ત્યારે બધું ખાલી કરવા)
   const resetForm = () => {
     setHeadName('');
     setMobileNumber('');
@@ -73,31 +72,23 @@ export default function FamilyRegistrationScreen() {
         return;
       }
 
-      // ૧. લોગિન થયેલા યુઝરનો મોબાઈલ નંબર મેળવો (ઈમેઈલ કે ફોન ગમે તેમાંથી)
-      // ✅ સુધારો: તમારા પ્રોફાઈલ મુજબ ઈમેઈલમાંથી નંબર પકડશે
       let rawMobile = user.phone || user.email || user.user_metadata?.mobile_number || '';
-      
-      // ૨. ✅ પાવરફુલ લોજિક: ઈમેઈલ કે ફોનમાંથી ફક્ત ૧૦ આંકડા જ પકડશે
       const userMobile = rawMobile.replace(/[^0-9]/g, '').slice(-10);
 
-      // ૩. ટેસ્ટિંગ એલર્ટ: જે તમને મોબાઈલમાં દેખાશે
-      alert("તમારો લોગિન નંબર આ રીતે સર્ચ થશે: " + userMobile);
+      // alert("તમારો લોગિન નંબર આ રીતે સર્ચ થશે: " + userMobile); // Debugging line kept if needed
 
-      // જો મોબાઈલ નંબર જ ના હોય તો ફોર્મ ખાલી રાખો
       if (!userMobile) {
         resetForm();
         setLoadingData(false);
         return;
       }
 
-      // ૨. ડેટાબેઝમાં શોધો: ફક્ત હાલના યુઝર માટે (user_id OR mobile_number)
       const { data: matchedRows } = await supabase
         .from('families')
         .select('*') 
         .or(`user_id.eq.${user.id},mobile_number.ilike.%${userMobile}%,member_mobile.ilike.%${userMobile}%`)
         .limit(1);
 
-      // ૩. જો ડેટા મળે તો ફોર્મ ભરો
       if (matchedRows && matchedRows.length > 0) {
         const head = matchedRows[0];
         
@@ -127,7 +118,6 @@ export default function FamilyRegistrationScreen() {
             if (loadedMembers.length > 0) {
                 setMembers(loadedMembers);
             } else {
-                 // જો સભ્યો ના મળે પણ હેડ મળે, તો એક ખાલી સભ્ય રાખો
                  setMembers([{ id: Date.now().toString(), memberName: '', relationship: '', gender: '', memberMobile: '' }]);
             }
         }
@@ -149,7 +139,8 @@ export default function FamilyRegistrationScreen() {
   const removeMember = async (id: string) => {
     if (members.length === 1) return;
     
-    if (!id.toString().startsWith('new-')) {
+    if (!id.toString().startsWith('new-') && isNaN(Number(id))) {
+       // Only delete from DB if it's a valid UUID (not temp ID)
        if(confirm("શું તમે આ સભ્યને કાયમી માટે ડીલીટ કરવા માંગો છો?")) {
           await supabase.from('families').delete().eq('id', id);
        } else {
@@ -163,6 +154,7 @@ export default function FamilyRegistrationScreen() {
     setMembers(members.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
   };
 
+  // ✅ UPDATED HANDLE SUBMIT TO FIX 400 ERROR
   const handleSubmit = async () => {
     if (!headName.trim() || !subSurname.trim() || !gol.trim() || !mobileNumber.trim()) {
       alert('મહેરબાની કરીને બધી ફરજિયાત (*) વિગતો ભરો');
@@ -175,10 +167,14 @@ export default function FamilyRegistrationScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('લોગીન કરવું જરૂરી છે');
 
-      const finalData = members
-        .filter((m) => m.memberName.trim())
-        .map((m) => {
-            const baseObj: any = {
+      // ૧. બે અલગ લિસ્ટ બનાવો: નવા અને જૂના
+      const recordsToInsert: any[] = [];
+      const recordsToUpdate: any[] = [];
+
+      members
+        .filter((m) => m.memberName.trim()) // ખાલી નામ વાળા કાઢી નાખો
+        .forEach((m) => {
+            const baseObj = {
                 user_id: user.id,
                 head_name: headName,
                 mobile_number: mobileNumber,
@@ -192,30 +188,42 @@ export default function FamilyRegistrationScreen() {
                 gender: m.gender,
                 member_mobile: m.memberMobile
             };
-            
-            // 🔥 અગત્યનું ફિક્સ: જો ID માં "new-" હોય અથવા તે ફક્ત આંકડા (Timestamp) હોય,
-            // તો તેને ડેટાબેઝમાં મોકલવી જ નહીં.
-            // UUID પ્રકારના ટેબલમાં આંકડાકીય ID ચાલતી નથી.
-            const isGeneratedId = m.id.toString().startsWith('new-') || !isNaN(Number(m.id));
 
-            if (!isGeneratedId) {
-                baseObj.id = m.id; // માત્ર સાચી UUID હોય તો જ મોકલવી
+            // ID ચેક કરો: જો 'new-' થી શરુ થાય કે નંબર હોય તો તે નવું છે
+            const isTempId = m.id.toString().startsWith('new-') || !isNaN(Number(m.id));
+
+            if (isTempId) {
+                // જો નવું ID હોય, તો તેને INSERT લિસ્ટમાં નાખો (ID વગર, જેથી Supabase UUID બનાવે)
+                recordsToInsert.push(baseObj);
+            } else {
+                // જો જૂનું UUID હોય, તો તેને UPDATE લિસ્ટમાં નાખો (ID સાથે)
+                recordsToUpdate.push({ ...baseObj, id: m.id });
             }
-            // ELSE માં કશું જ લખવાનું નથી, જેથી નવી ID 'null' તરીકે ના જાય અને Supabase પોતે જનરેટ કરે
-            
-            return baseObj;
         });
 
-      const { error } = await supabase
-        .from('families')
-        .upsert(finalData, { onConflict: 'id' });
+      // ૨. નવા ડેટાને INSERT કરો
+      if (recordsToInsert.length > 0) {
+          const { error: insertError } = await supabase
+            .from('families')
+            .insert(recordsToInsert);
+          
+          if (insertError) throw insertError;
+      }
 
-      if (error) throw error;
+      // ૩. જૂના ડેટાને UPDATE (Upsert) કરો
+      if (recordsToUpdate.length > 0) {
+          const { error: updateError } = await supabase
+            .from('families')
+            .upsert(recordsToUpdate, { onConflict: 'id' });
+            
+          if (updateError) throw updateError;
+      }
 
       alert('પરિવારની વિગતો સફળતાપૂર્વક સેવ થઈ ગઈ!');
-      navigate('/family-list');
+      navigate('/family-list'); // અથવા જ્યાં રીડાયરેક્ટ કરવું હોય ત્યાં
 
     } catch (error: any) {
+      console.error(error);
       alert('ભૂલ: ' + error.message);
     } finally {
       setIsSubmitting(false);
