@@ -17,6 +17,9 @@ export default function PrivateChatScreen() {
   const [otherUser, setOtherUser] = useState({ id: '', name: '', image: '' });
   const [isOnline, setIsOnline] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
+  // ✅ નવી ફ્લેગ: ડેટા લોડ થઈ જાય પછી જ Realtime ચાલુ થશે
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
 
   const messagesEndRef = useRef(null);
 
@@ -24,9 +27,52 @@ export default function PrivateChatScreen() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // ✅ 1. Realtime Subscription (હવે લૂપ નહીં થાય)
+  // 1️⃣ Step 1: પહેલા યુઝર અને જૂના મેસેજ લોડ કરો
   useEffect(() => {
-    if (!roomId || !currentUserId) return;
+    if (roomId) fetchChatDetails();
+  }, [roomId]);
+
+  const fetchChatDetails = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setCurrentUserId(user.id);
+
+      // રૂમ અને સામેવાળાની વિગત
+      const { data: roomData } = await supabase.from('chat_rooms').select('participant_ids').eq('id', roomId).single();
+
+      if (roomData) {
+        const otherId = roomData.participant_ids.find((id) => id !== user.id);
+        if (otherId) {
+          const { data: profile } = await supabase.from('matrimony_profiles').select('user_id, full_name, image_url').eq('user_id', otherId).single();
+          if (profile) {
+            setOtherUser({ 
+              id: profile.user_id, 
+              name: profile.full_name, 
+              image: profile.image_url || `https://ui-avatars.com/api/?name=${profile.full_name}&background=random` 
+            });
+          }
+        }
+      }
+
+      // મેસેજ લોડ કરો
+      const { data: msgs } = await supabase.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
+      if (msgs) {
+        setMessages(msgs); // જૂના મેસેજ સેટ કરો
+        setTimeout(scrollToBottom, 300);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+      setInitialFetchDone(true); // ✅ હવે Realtime માટે લીલી ઝંડી
+    }
+  };
+
+  // 2️⃣ Step 2: Realtime Connection (ફક્ત ડેટા લોડ થયા પછી જ)
+  useEffect(() => {
+    // જો ડેટા લોડ ન થયો હોય, તો કનેક્ટ ન કરો (Race Condition Fix)
+    if (!roomId || !currentUserId || !initialFetchDone) return;
 
     console.log("🔌 Connecting to Realtime for Room:", roomId);
 
@@ -38,11 +84,12 @@ export default function PrivateChatScreen() {
           event: 'INSERT', 
           schema: 'public', 
           table: 'messages',
-          filter: `room_id=eq.${roomId}` // ✅ આ ફિલ્ટર મેસેજને ચોક્કસ પકડશે
+          filter: `room_id=eq.${roomId}` 
         }, 
         (payload) => {
           console.log("🔥 નવો મેસેજ આવ્યો:", payload);
           setMessages((prev) => {
+            // ડુપ્લિકેટ અટકાવો
             if (prev.find(m => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
           });
@@ -53,7 +100,7 @@ export default function PrivateChatScreen() {
         console.log("📡 Message Status:", status);
       });
 
-    // Presence Channel (Online Status)
+    // ઓનલાઇન સ્ટેટસ
     const presenceChannel = supabase.channel(`presence_${roomId}`, {
       config: { presence: { key: currentUserId } }
     });
@@ -78,48 +125,7 @@ export default function PrivateChatScreen() {
       supabase.removeChannel(presenceChannel);
     };
 
-  // ⚠️ સુધારો: અહીંથી 'otherUser' કાઢી નાખ્યું જેથી લૂપ ન થાય
-  }, [roomId, currentUserId]); 
-
-  // ✅ 2. ડેટા લોડ કરવા માટે અલગ Effect
-  useEffect(() => {
-    if (roomId) fetchChatDetails();
-  }, [roomId]);
-
-  const fetchChatDetails = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setCurrentUserId(user.id);
-
-      const { data: roomData } = await supabase.from('chat_rooms').select('participant_ids').eq('id', roomId).single();
-
-      if (roomData) {
-        const otherId = roomData.participant_ids.find((id) => id !== user.id);
-        if (otherId) {
-          const { data: profile } = await supabase.from('matrimony_profiles').select('user_id, full_name, image_url').eq('user_id', otherId).single();
-          if (profile) {
-            setOtherUser({ 
-              id: profile.user_id, 
-              name: profile.full_name, 
-              // ✅ ફિક્સ: 150px વાળી લિંક હટાવી દીધી
-              image: profile.image_url || `https://ui-avatars.com/api/?name=${profile.full_name}&background=random` 
-            });
-          }
-        }
-      }
-
-      const { data: msgs } = await supabase.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
-      if (msgs) {
-        setMessages(msgs);
-        setTimeout(scrollToBottom, 300);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [roomId, currentUserId, initialFetchDone]); // ✅ અહીં dependency બરાબર છે
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !currentUserId || !roomId || !otherUser.id) return;
