@@ -414,9 +414,12 @@ export default function MatrimonyScreen() {
             {selectedProfile ? (
               <div className="bg-white rounded-[40px] p-6 shadow-xl border border-pink-50">
                 <div className="text-center mb-6">
-                  {/* ✅ Big Photo: w-full h-96 */}
-                  <div className="w-full h-96 bg-pink-50 rounded-3xl mb-6 border-4 border-white shadow-lg overflow-hidden">
-                    <img src={selectedProfile.image_url || 'https://ui-avatars.com/api/?name=User&background=random'} className="w-full h-full object-cover" />
+                  {/* ✅ Big Photo: Vertical (3:4) & Face Center */}
+                  <div className="w-full aspect-[3/4] bg-pink-50 rounded-3xl mb-6 border-4 border-white shadow-lg overflow-hidden relative">
+                    <img 
+                      src={selectedProfile.image_url || 'https://ui-avatars.com/api/?name=User&background=random'} 
+                      className="w-full h-full object-cover object-top" 
+                    />
                   </div>
                   <h2 className="text-2xl font-black text-gray-800">{selectedProfile.full_name}</h2>
                   <p className="text-pink-500 font-bold uppercase text-xs tracking-widest">{selectedProfile.peta_atak}</p>
