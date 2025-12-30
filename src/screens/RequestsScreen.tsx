@@ -135,7 +135,6 @@ export default function RequestsScreen() {
     }
   };
 
-  // ✅ સુધારેલું લોજિક: જો રૂમ ન હોય તો બનાવીને Redirect કરશે
   const handleStartChat = async (otherId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if(!user) return;
@@ -149,10 +148,8 @@ export default function RequestsScreen() {
         .maybeSingle();
 
     if (room) {
-        // ૨. જો રૂમ મળી જાય તો નેવિગેટ કરો
         navigate(`/private-chat/${room.id}`);
     } else {
-        // ૩. જો રૂમ ન હોય, તો બનાવીને જ અંદર મોકલો (Blank screen કે Error નહીં આવે)
         const { data: newRoom } = await supabase
             .from('chat_rooms')
             .insert([{ type: 'matrimony', participant_ids: [user.id, otherId] }])
@@ -216,7 +213,11 @@ export default function RequestsScreen() {
                             requests.map((req) => (
                                 <div key={req.id} className="bg-white p-6 rounded-[35px] shadow-sm flex items-center justify-between">
                                     <div className="flex items-center space-x-5">
-                                        <img src={req.profile?.image_url || 'https://via.placeholder.com/150'} className="w-16 h-16 rounded-3xl object-cover" />
+                                        <img 
+                                            src={req.profile?.image_url || `https://ui-avatars.com/api/?name=${req.profile?.full_name || 'User'}&background=random`} 
+                                            className="w-16 h-16 rounded-3xl object-cover" 
+                                            alt="Profile"
+                                        />
                                         <div>
                                             <h3 className="font-bold text-gray-800">{req.profile?.full_name}</h3>
                                             <p className="text-[11px] text-pink-600 font-black">{req.profile?.village} | {req.profile?.age} વર્ષ</p>
@@ -241,7 +242,11 @@ export default function RequestsScreen() {
                             connections.map((conn) => (
                                 <div key={conn.id} className="bg-white p-6 rounded-[35px] shadow-sm flex items-center justify-between">
                                     <div className="flex items-center space-x-5">
-                                        <img src={conn.profile?.image_url || 'https://via.placeholder.com/150'} className="w-16 h-16 rounded-3xl object-cover" />
+                                        <img 
+                                            src={conn.profile?.image_url || `https://ui-avatars.com/api/?name=${conn.profile?.full_name || 'User'}&background=random`} 
+                                            className="w-16 h-16 rounded-3xl object-cover" 
+                                            alt="Profile"
+                                        />
                                         <div>
                                             <h3 className="font-bold text-gray-800">{conn.profile?.full_name}</h3>
                                             <p className="text-[10px] text-green-600 font-black flex items-center">
