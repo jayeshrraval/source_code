@@ -100,14 +100,14 @@ export default function RequestsScreen() {
 
         if (updateError) throw updateError;
 
-        const { data: existingRoom } = await supabase
+        // રિક્વેસ્ટ સ્વીકારતી વખતે પણ ડુપ્લિકેટ ચેક કરો
+        const { data: existingRooms } = await supabase
             .from('chat_rooms')
             .select('id')
             .contains('participant_ids', [user.id, senderId])
-            .eq('type', 'matrimony')
-            .maybeSingle();
+            .eq('type', 'matrimony');
 
-        if (!existingRoom) {
+        if (!existingRooms || existingRooms.length === 0) {
             await supabase
                 .from('chat_rooms')
                 .insert([{
@@ -135,31 +135,40 @@ export default function RequestsScreen() {
     }
   };
 
+  // ✅ SUPER FIX: ડુપ્લિકેટ રૂમની સમસ્યા કાયમ માટે ગાયબ
   const handleStartChat = async (otherId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if(!user) return;
 
-    // ૧. પહેલા રૂમ શોધો
-    const { data: room } = await supabase
+    // ૧. બંને યુઝર જેમાં હોય તેવા *બધા* રૂમ શોધો (એક નહીં)
+    const { data: existingRooms, error } = await supabase
         .from('chat_rooms')
-        .select('id')
-        .contains('participant_ids', [user.id, otherId])
+        .select('id, created_at')
+        .contains('participant_ids', [user.id, otherId]) // આ બંને ID હોવા જોઈએ
         .eq('type', 'matrimony')
-        .maybeSingle();
+        .order('created_at', { ascending: true }); // સૌથી જૂનો રૂમ પહેલા
 
-    if (room) {
-        navigate(`/private-chat/${room.id}`);
+    if (existingRooms && existingRooms.length > 0) {
+        // ✅ જો રૂમ મળી જાય (ભલે ૨-૩ હોય), તો હંમેશા *પહેલો* (સૌથી જૂનો) રૂમ જ પકડો
+        console.log("Existing Room Found (Using Oldest):", existingRooms[0].id);
+        navigate(`/private-chat/${existingRooms[0].id}`);
     } else {
-        const { data: newRoom } = await supabase
+        // ૨. જો એકપણ રૂમ ન હોય, તો જ નવો બનાવો
+        console.log("No room found. Creating NEW Room...");
+        const { data: newRoom, error: createError } = await supabase
             .from('chat_rooms')
-            .insert([{ type: 'matrimony', participant_ids: [user.id, otherId] }])
+            .insert([{ 
+                type: 'matrimony', 
+                participant_ids: [user.id, otherId] 
+            }])
             .select()
             .single();
             
         if (newRoom) {
             navigate(`/private-chat/${newRoom.id}`);
         } else {
-            alert("ચેટ શરૂ કરવામાં ભૂલ છે. ફરી પ્રયાસ કરો.");
+            console.error(createError);
+            alert("ચેટ શરૂ કરવામાં ભૂલ છે.");
         }
     }
   };
