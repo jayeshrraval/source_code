@@ -24,25 +24,21 @@ export default function PrivateChatScreen() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // ✅ 1. Realtime Subscription Effect (સુધારેલો)
+  // ✅ 1. Realtime Subscription (હવે લૂપ નહીં થાય)
   useEffect(() => {
-    // જ્યાં સુધી ID ન મળે ત્યાં સુધી કનેક્ટ ન કરો
     if (!roomId || !currentUserId) return;
 
     console.log("🔌 Connecting to Realtime for Room:", roomId);
 
-    // ચેનલનું યુનિક નામ
-    const channelId = `room_chat_${roomId}`;
-
     const messageChannel = supabase
-      .channel(channelId)
+      .channel(`room_chat_${roomId}`)
       .on(
         'postgres_changes', 
         { 
           event: 'INSERT', 
           schema: 'public', 
           table: 'messages',
-          filter: `room_id=eq.${roomId}` // ✅ સર્વર સાઈડ ફિલ્ટર (મહત્વનું)
+          filter: `room_id=eq.${roomId}` // ✅ આ ફિલ્ટર મેસેજને ચોક્કસ પકડશે
         }, 
         (payload) => {
           console.log("🔥 નવો મેસેજ આવ્યો:", payload);
@@ -66,7 +62,6 @@ export default function PrivateChatScreen() {
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState();
         if (otherUser?.id) {
-          // ચેક કરો કે સામેવાળો યુઝર લિસ્ટમાં છે કે નહીં
           const isOnlineNow = Object.values(state).flat().some((u: any) => u.user_id === otherUser.id);
           setIsOnline(isOnlineNow);
         }
@@ -77,16 +72,16 @@ export default function PrivateChatScreen() {
         }
       });
 
-    // ✅ સાચી સફાઈ: માત્ર આ જ ચેનલ બંધ કરો, આખી દુનિયાની નહીં
     return () => {
-      console.log("🧹 Cleaning up...");
+      console.log("🧹 Cleaning up channels...");
       supabase.removeChannel(messageChannel);
       supabase.removeChannel(presenceChannel);
     };
 
-  }, [roomId, currentUserId]); // otherUser ને અહીંથી કાઢી નાખ્યો જેથી વારંવાર રી-કનેક્ટ ન થાય
+  // ⚠️ સુધારો: અહીંથી 'otherUser' કાઢી નાખ્યું જેથી લૂપ ન થાય
+  }, [roomId, currentUserId]); 
 
-  // ✅ 2. ડેટા લાવવા માટેનો અલગ Effect
+  // ✅ 2. ડેટા લોડ કરવા માટે અલગ Effect
   useEffect(() => {
     if (roomId) fetchChatDetails();
   }, [roomId]);
@@ -107,6 +102,7 @@ export default function PrivateChatScreen() {
             setOtherUser({ 
               id: profile.user_id, 
               name: profile.full_name, 
+              // ✅ ફિક્સ: 150px વાળી લિંક હટાવી દીધી
               image: profile.image_url || `https://ui-avatars.com/api/?name=${profile.full_name}&background=random` 
             });
           }
@@ -184,7 +180,7 @@ export default function PrivateChatScreen() {
         </div>
       </div>
 
-      {/* Chat Messages */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2 relative" 
            style={{ backgroundImage: "url('https://i.pinimg.com/originals/ab/ab/60/abab60f06ab52fa727e78f20501f57df.png')", backgroundSize: 'contain' }}>
         {loading ? (
@@ -212,7 +208,7 @@ export default function PrivateChatScreen() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
+      {/* Input */}
       <div className="relative">
         {showEmojiPicker && (
           <div className="absolute bottom-16 left-0 right-0 z-30">
