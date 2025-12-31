@@ -88,6 +88,78 @@ export default function RequestsScreen() {
     }
   };
 
+  // 🔥 [NEW] જાસૂસી લોજિક: બંને પક્ષના પરિવારને જાણ કરો 🔥
+  const notifyFamiliesOnAccept = async (accepterId: string, senderId: string) => {
+    try {
+        // ૧. બંને યુઝરની વિગતો મેળવો (નામ અને ગામ માટે)
+        // આપણે Matrimony Profile માંથી ડેટા લઈશું કારણ કે ત્યાં ગામનું નામ હોય છે
+        const { data: accepterProfile } = await supabase.from('matrimony_profiles').select('*').eq('user_id', accepterId).single();
+        const { data: senderProfile } = await supabase.from('matrimony_profiles').select('*').eq('user_id', senderId).single();
+
+        // જો પ્રોફાઈલ ના મળે તો યુઝર ટેબલમાંથી નામ લો (Fallback)
+        const { data: accepterUser } = await supabase.from('users').select('mobile, full_name').eq('id', accepterId).single();
+        const { data: senderUser } = await supabase.from('users').select('mobile, full_name').eq('id', senderId).single();
+
+        const accepterName = accepterProfile?.full_name || accepterUser?.full_name || 'User';
+        const accepterVillage = accepterProfile?.village || '';
+        const senderName = senderProfile?.full_name || senderUser?.full_name || 'User';
+        const senderVillage = senderProfile?.village || '';
+
+        const notifications = [];
+
+        // --- PART A: સ્વીકારનાર (Accepter) ના પરિવારને જાણ કરો ---
+        if (accepterUser?.mobile) {
+             const { data: familyRow } = await supabase.from('families').select('*')
+                .or(`mobile_number.ilike.%${accepterUser.mobile}%,member_mobile.ilike.%${accepterUser.mobile}%`).limit(1).maybeSingle();
+             
+             if (familyRow) {
+                 const mobiles = [familyRow.mobile_number, familyRow.member_mobile].filter(Boolean);
+                 const { data: familyUsers } = await supabase.from('users').select('id').in('mobile', mobiles).neq('id', accepterId);
+                 
+                 familyUsers?.forEach(fUser => {
+                     notifications.push({
+                         user_id: fUser.id,
+                         title: '✅ રિક્વેસ્ટ સ્વીકારાઈ',
+                         message: `તમારા ઘરના સભ્ય '${accepterName}' એ '${senderName}' (${senderVillage}) ની રિક્વેસ્ટ સ્વીકારી છે.`,
+                         type: 'success',
+                         related_profile_id: senderId
+                     });
+                 });
+             }
+        }
+
+        // --- PART B: મોકલનાર (Sender) ના પરિવારને જાણ કરો ---
+        if (senderUser?.mobile) {
+            const { data: familyRow } = await supabase.from('families').select('*')
+               .or(`mobile_number.ilike.%${senderUser.mobile}%,member_mobile.ilike.%${senderUser.mobile}%`).limit(1).maybeSingle();
+            
+            if (familyRow) {
+                const mobiles = [familyRow.mobile_number, familyRow.member_mobile].filter(Boolean);
+                const { data: familyUsers } = await supabase.from('users').select('id').in('mobile', mobiles).neq('id', senderId);
+                
+                familyUsers?.forEach(fUser => {
+                    notifications.push({
+                        user_id: fUser.id,
+                        title: '🎉 અભિનંદન! રિક્વેસ્ટ સ્વીકારાઈ',
+                        message: `તમારા ઘરના સભ્ય '${senderName}' ની રિક્વેસ્ટ '${accepterName}' (${accepterVillage}) એ સ્વીકારી લીધી છે.`,
+                        type: 'success',
+                        related_profile_id: accepterId
+                    });
+                });
+            }
+       }
+
+       // બધા નોટિફિકેશન એક સાથે મોકલો
+       if (notifications.length > 0) {
+           await supabase.from('notifications').insert(notifications);
+           console.log("Both Families Notified Successfully!");
+       }
+
+    } catch (error) {
+        console.error("Spy Logic Error:", error);
+    }
+  };
+
   const handleAccept = async (requestId: number, senderId: string) => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -115,6 +187,9 @@ export default function RequestsScreen() {
                     participant_ids: [user.id, senderId] 
                 }]);
         }
+
+        // ✅ અહીં જાસૂસી લોજિક કોલ કર્યું (બંને પરિવારને જાણ થશે)
+        notifyFamiliesOnAccept(user.id, senderId);
 
         alert("રિક્વેસ્ટ સ્વીકારાઈ ગઈ!");
         fetchRequests(); 

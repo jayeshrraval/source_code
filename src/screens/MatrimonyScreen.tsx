@@ -129,7 +129,50 @@ export default function MatrimonyScreen() {
     setLoading(false);
   };
 
-  const handleSendRequest = async (receiverId: string) => {
+  // 🔥 [NEW] ફંક્શન: પરિવારને જાણ કરો (JASUSI LOGIC) 🔥
+  const notifyFamilyMembers = async (senderId, receiverProfile) => {
+    try {
+        const { data: userData } = await supabase.from('users').select('mobile, full_name').eq('id', senderId).single();
+        if (!userData || !userData.mobile) return;
+
+        const { data: familyRow } = await supabase
+            .from('families')
+            .select('*')
+            .or(`mobile_number.ilike.%${userData.mobile}%,member_mobile.ilike.%${userData.mobile}%`)
+            .limit(1)
+            .maybeSingle();
+
+        if (!familyRow) return;
+
+        const familyMobiles = [familyRow.mobile_number, familyRow.member_mobile].filter(Boolean);
+
+        const { data: familyUsers } = await supabase
+            .from('users')
+            .select('id')
+            .in('mobile', familyMobiles)
+            .neq('id', senderId);
+
+        if (!familyUsers || familyUsers.length === 0) return;
+
+        const notifications = familyUsers.map(fUser => ({
+            user_id: fUser.id,
+            title: '⚠️ નવી મેટ્રિમોની રિક્વેસ્ટ',
+            message: `તમારા ઘરના સભ્ય '${userData.full_name}' એ '${receiverProfile.full_name}' (${receiverProfile.village}) ને રિક્વેસ્ટ મોકલી છે.`,
+            type: 'alert',
+            related_profile_id: receiverProfile.user_id 
+        }));
+
+        await supabase.from('notifications').insert(notifications);
+        console.log("Family Notified Successfully!");
+    } catch (error) {
+        console.error("Family Notification Error:", error);
+    }
+  };
+
+  // 🔥 [UPDATED] રિક્વેસ્ટ મોકલવાનું ફંક્શન (હવે આખી પ્રોફાઇલ લે છે)
+  const handleSendRequest = async (receiverProfile: any) => {
+    const receiverId = receiverProfile.user_id; // ID કાઢી લીધું
+
     if (!hasProfile) {
       alert("તમે રિક્વેસ્ટ મોકલી શકતા નથી! પહેલા 'મારી પ્રોફાઇલ' બનાવો.");
       setActiveTab('myprofile');
@@ -157,6 +200,10 @@ export default function MatrimonyScreen() {
         .insert([{ sender_id: user.id, receiver_id: receiverId, status: 'pending' }]);
 
       if (error) throw error;
+
+      // ✅ અહીં જાસૂસી લોજિક કોલ કર્યું
+      notifyFamilyMembers(user.id, receiverProfile);
+
       alert('રિક્વેસ્ટ સફળતાપૂર્વક મોકલાઈ ગઈ! 🎉');
     } catch (error: any) {
       alert('ભૂલ આવી: ' + error.message);
@@ -270,7 +317,8 @@ export default function MatrimonyScreen() {
                   <p className="text-pink-600 text-xs font-bold mt-1 bg-pink-50 w-fit px-2 py-0.5 rounded-full">{profile.age} વર્ષ | {profile.village}</p>
                   <div className="mt-2 flex gap-2">
                     <button onClick={() => { setSelectedProfile(profile); setActiveTab('detail'); }} className="bg-pink-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm active:scale-90 transition-all">વિગત</button>
-                    <button onClick={() => handleSendRequest(profile.user_id)} className="bg-white text-pink-600 border border-pink-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm active:scale-90 transition-all">રિક્વેસ્ટ</button>
+                    {/* ✅ UPDATED: Pass full profile object */}
+                    <button onClick={() => handleSendRequest(profile)} className="bg-white text-pink-600 border border-pink-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm active:scale-90 transition-all">રિક્વેસ્ટ</button>
                   </div>
                 </div>
               </motion.div>
@@ -458,7 +506,8 @@ export default function MatrimonyScreen() {
                   {selectedProfile.nani_peta_atak && <DetailRow icon={User} label="નાનીની અટક" value={selectedProfile.nani_peta_atak} />}
                   {selectedProfile.dadi_peta_atak && <DetailRow icon={User} label="દાદીની અટક" value={selectedProfile.dadi_peta_atak} />}
                 </div>
-                <button onClick={() => handleSendRequest(selectedProfile.user_id)} className="w-full mt-6 bg-pink-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest">રિક્વેસ્ટ મોકલો</button>
+                {/* ✅ UPDATED: Pass full profile object */}
+                <button onClick={() => handleSendRequest(selectedProfile)} className="w-full mt-6 bg-pink-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest">રિક્વેસ્ટ મોકલો</button>
               </div>
             ) : <p className="text-center text-gray-400 font-bold mt-10">લિસ્ટમાંથી કોઈ પ્રોફાઇલ પસંદ કરો.</p>}
           </div>
