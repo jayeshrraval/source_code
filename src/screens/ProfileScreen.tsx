@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, Phone, LogOut, Camera, ChevronRight, 
-  Heart, Users, FileText, Settings, Loader2, Save 
+  Heart, Users, FileText, Settings, Loader2, Save, Calendar 
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import { supabase } from '../supabaseClient';
@@ -20,7 +20,8 @@ export default function ProfileScreen() {
     id: '',
     full_name: '',
     mobile: '',
-    avatar_url: ''
+    avatar_url: '',
+    dob: '' // ✅ જન્મ તારીખ માટે સ્ટેટ ઉમેર્યું
   });
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function ProfileScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        navigate('/'); // If not logged in, go to login
+        navigate('/'); 
         return;
       }
       setUserSession(user);
@@ -47,8 +48,9 @@ export default function ProfileScreen() {
         setProfile({
           id: data.id,
           full_name: data.full_name || '',
-          mobile: data.mobile || user.email?.split('@')[0] || '', // Fallback to mobile from fake email
-          avatar_url: data.avatar_url || ''
+          mobile: data.mobile || user.email?.split('@')[0] || '',
+          avatar_url: data.avatar_url || '',
+          dob: data.dob || '' // ✅ ડેટાબેઝમાંથી DOB લાવ્યા
         });
       }
     } catch (error) {
@@ -87,7 +89,6 @@ export default function ProfileScreen() {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Update Local State & DB
       setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
       await updateProfileInDB({ avatar_url: publicUrl });
       
@@ -101,12 +102,16 @@ export default function ProfileScreen() {
     }
   };
 
-  // 💾 Update Name
-  const handleSaveName = async () => {
+  // 💾 Save Details (Name + DOB)
+  const handleSaveDetails = async () => {
     setSaving(true);
-    await updateProfileInDB({ full_name: profile.full_name });
+    // ✅ નામ અને જન્મ તારીખ બંને સેવ થશે
+    await updateProfileInDB({ 
+        full_name: profile.full_name,
+        dob: profile.dob 
+    });
     setSaving(false);
-    alert('નામ અપડેટ થઈ ગયું!');
+    alert('પ્રોફાઈલ વિગતો અપડેટ થઈ ગઈ!');
   };
 
   // Helper to update DB
@@ -131,7 +136,7 @@ export default function ProfileScreen() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header / Cover */}
-      <div className="bg-gradient-to-br from-deep-blue to-[#1A8FA3] pb-20 pt-10 px-6 rounded-b-[2.5rem] shadow-lg">
+      <div className="bg-gradient-to-br from-deep-blue to-[#1A8FA3] pb-24 pt-10 px-6 rounded-b-[2.5rem] shadow-lg">
         <div className="flex justify-between items-center mb-6">
             <h1 className="text-white font-bold font-gujarati text-2xl">મારું એકાઉન્ટ</h1>
             <button onClick={() => navigate('/settings')} className="p-2 bg-white/20 rounded-full">
@@ -158,9 +163,10 @@ export default function ProfileScreen() {
                 </label>
              </div>
              
-             <div className="mt-4 text-center w-full max-w-xs">
+             <div className="mt-4 text-center w-full max-w-xs space-y-3">
+                
                 {/* Editable Name Input */}
-                <div className="flex items-center justify-center space-x-2 bg-white/10 rounded-xl p-1 mb-1">
+                <div className="flex items-center justify-center space-x-2 bg-white/10 rounded-xl p-1">
                     <input 
                         type="text" 
                         value={profile.full_name} 
@@ -168,13 +174,31 @@ export default function ProfileScreen() {
                         className="bg-transparent text-white font-bold text-xl text-center focus:outline-none w-full font-gujarati placeholder-white/50"
                         placeholder="તમારું નામ"
                     />
-                    <button onClick={handleSaveName} className="p-1.5 bg-white/20 rounded-lg hover:bg-white/30">
-                        {saving ? <Loader2 className="w-4 h-4 text-white animate-spin"/> : <Save className="w-4 h-4 text-white"/>}
-                    </button>
                 </div>
+
+                {/* Mobile Display */}
                 <p className="text-mint text-sm font-medium flex items-center justify-center">
                     <Phone className="w-3 h-3 mr-1" /> +91 {profile.mobile}
                 </p>
+
+                {/* ✅ DOB Input (New Feature) */}
+                <div className="flex items-center justify-center space-x-2">
+                    <div className="flex items-center bg-white/20 px-3 py-1.5 rounded-lg">
+                        <Calendar className="w-3 h-3 text-white mr-2" />
+                        <input 
+                            type="date"
+                            value={profile.dob}
+                            onChange={(e) => setProfile({...profile, dob: e.target.value})}
+                            className="bg-transparent text-white text-sm focus:outline-none font-gujarati"
+                            placeholder="જન્મ તારીખ"
+                        />
+                    </div>
+                    {/* Save Button for Name & DOB */}
+                    <button onClick={handleSaveDetails} className="p-2 bg-royal-gold rounded-lg shadow-md hover:bg-yellow-500 active:scale-95 transition-all">
+                        {saving ? <Loader2 className="w-4 h-4 text-deep-blue animate-spin"/> : <Save className="w-4 h-4 text-deep-blue"/>}
+                    </button>
+                </div>
+
              </div>
         </div>
       </div>

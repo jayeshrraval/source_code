@@ -3,6 +3,9 @@ import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabaseClient';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
+// ✅ AdMob Imports
+import { AdMob, BannerAdSize, BannerAdPosition } from '@capacitor-community/admob';
+
 import SplashScreen from './screens/SplashScreen';
 import LoginScreen from "./screens/LoginScreen";
 import HomeScreen from './screens/HomeScreen';
@@ -30,8 +33,6 @@ import KrishnaChatScreen from './screens/KrishnaChatScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import AboutScreen from './screens/AboutScreen'; 
-
-// ✅ MessagesScreen ઈમ્પોર્ટ કરેલું છે
 import MessagesScreen from './screens/MessagesScreen';
 
 export default function App() {
@@ -46,6 +47,25 @@ export default function App() {
       } catch (error) {
         console.error("Capgo error:", error);
       }
+
+      // 🔥 AdMob સેટઅપ (Real ID સાથે)
+      try {
+        await AdMob.initialize({
+          requestTrackingAuthorization: true,
+        });
+
+        await AdMob.showBanner({
+          // ✅ તમારો અસલી Ad Unit ID અહી નાખ્યો છે:
+          adId: 'ca-app-pub-2459932160741563/8195857584', 
+
+          adSize: BannerAdSize.BANNER,
+          position: BannerAdPosition.BOTTOM_CENTER, 
+          margin: 0, 
+        });
+      } catch (e) {
+        console.error('AdMob Error:', e);
+      }
+      // 🔥 AdMob સેટઅપ પૂરું
 
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       setSession(currentSession);
@@ -94,10 +114,8 @@ export default function App() {
         <Route path="/matrimony" element={<ProtectedRoute><MatrimonyScreen /></ProtectedRoute>} />
         <Route path="/requests" element={<ProtectedRoute><RequestsScreen /></ProtectedRoute>} />
         
-        {/* ✅ ચેટ માટેના રાઉટ્સ (બંને લિંક સપોર્ટ કરશે) */}
         <Route path="/messages" element={<ProtectedRoute><MessagesScreen /></ProtectedRoute>} />
         <Route path="/chat/:roomId" element={<ProtectedRoute><PrivateChatScreen /></ProtectedRoute>} />
-        {/* 👇 આ જૂની લિંક ઉમેરી જેથી જૂના પેજ પરથી પણ ચેટ ખૂલે 👇 */}
         <Route path="/private-chat/:roomId" element={<ProtectedRoute><PrivateChatScreen /></ProtectedRoute>} />
         
         <Route path="/general-chat" element={<ProtectedRoute><GeneralChatScreen /></ProtectedRoute>} />
