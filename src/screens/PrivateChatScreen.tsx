@@ -18,7 +18,6 @@ export default function PrivateChatScreen() {
   const [isOnline, setIsOnline] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
-  // ✅ નવી ફ્લેગ: ડેટા લોડ થઈ જાય પછી જ Realtime ચાલુ થશે
   const [initialFetchDone, setInitialFetchDone] = useState(false);
 
   const messagesEndRef = useRef(null);
@@ -27,7 +26,19 @@ export default function PrivateChatScreen() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // 1️⃣ Step 1: પહેલા યુઝર અને જૂના મેસેજ લોડ કરો
+  // ✅ નવું ફંક્શન: સામેવાળાના મેસેજ આપણે વાંચીએ એટલે તેને 'Read' કરી દેવાના
+  const markMessagesAsRead = async (userId, senderId) => {
+    if (!userId || !roomId || !senderId) return;
+
+    await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('room_id', roomId)
+      .eq('receiver_id', userId) // હું રીસીવર છું
+      .eq('sender_id', senderId) // સામેવાળો સેન્ડર છે
+      .eq('is_read', false); // જે વંચાયા નથી તેને જ અપડેટ કરો
+  };
+
   useEffect(() => {
     if (roomId) fetchChatDetails();
   }, [roomId]);
@@ -38,12 +49,14 @@ export default function PrivateChatScreen() {
       if (!user) return;
       setCurrentUserId(user.id);
 
-      // રૂમ અને સામેવાળાની વિગત
       const { data: roomData } = await supabase.from('chat_rooms').select('participant_ids').eq('id', roomId).single();
+
+      let otherUserId = null; // સામેવાળાનું ID સેવ કરવા માટે
 
       if (roomData) {
         const otherId = roomData.participant_ids.find((id) => id !== user.id);
         if (otherId) {
+          otherUserId = otherId;
           const { data: profile } = await supabase.from('matrimony_profiles').select('user_id, full_name, image_url').eq('user_id', otherId).single();
           if (profile) {
             setOtherUser({ 
@@ -55,23 +68,25 @@ export default function PrivateChatScreen() {
         }
       }
 
-      // મેસેજ લોડ કરો
       const { data: msgs } = await supabase.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
       if (msgs) {
-        setMessages(msgs); // જૂના મેસેજ સેટ કરો
+        setMessages(msgs);
         setTimeout(scrollToBottom, 300);
+        
+        // ✅ લોડ થતાની સાથે જ સામેવાળાના મેસેજ વાંચી લીધા એમ બતાવો
+        if (otherUserId) {
+            markMessagesAsRead(user.id, otherUserId);
+        }
       }
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoading(false);
-      setInitialFetchDone(true); // ✅ હવે Realtime માટે લીલી ઝંડી
+      setInitialFetchDone(true);
     }
   };
 
-  // 2️⃣ Step 2: Realtime Connection (ફક્ત ડેટા લોડ થયા પછી જ)
   useEffect(() => {
-    // જો ડેટા લોડ ન થયો હોય, તો કનેક્ટ ન કરો (Race Condition Fix)
     if (!roomId || !currentUserId || !initialFetchDone) return;
 
     console.log("🔌 Connecting to Realtime for Room:", roomId);
@@ -81,26 +96,40 @@ export default function PrivateChatScreen() {
       .on(
         'postgres_changes', 
         { 
-          event: 'INSERT', 
+          event: '*', // ✅ INSERT અને UPDATE બંને સાંભળવા માટે '*' કરી દીધું
           schema: 'public', 
           table: 'messages',
           filter: `room_id=eq.${roomId}` 
         }, 
         (payload) => {
-          console.log("🔥 નવો મેસેજ આવ્યો:", payload);
-          setMessages((prev) => {
-            // ડુપ્લિકેટ અટકાવો
-            if (prev.find(m => m.id === payload.new.id)) return prev;
-            return [...prev, payload.new];
-          });
-          setTimeout(scrollToBottom, 100);
+          
+          // 1. જો નવો મેસેજ આવે (INSERT)
+          if (payload.eventType === 'INSERT') {
+            console.log("🔥 નવો મેસેજ આવ્યો:", payload.new);
+            setMessages((prev) => {
+              if (prev.find(m => m.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+            setTimeout(scrollToBottom, 100);
+
+            // જો મેસેજ સામેવાળાએ મોકલ્યો હોય, તો તરત જ તેને 'Read' માર્ક કરો
+            if (payload.new.receiver_id === currentUserId) {
+                markMessagesAsRead(currentUserId, payload.new.sender_id);
+            }
+          }
+
+          // 2. જો મેસેજ વંચાયો હોય (UPDATE) - તો Blue Tick અપડેટ કરો
+          if (payload.eventType === 'UPDATE') {
+             setMessages((prev) => prev.map((msg) => 
+                msg.id === payload.new.id ? { ...msg, is_read: payload.new.is_read } : msg
+             ));
+          }
         }
       )
       .subscribe((status) => {
         console.log("📡 Message Status:", status);
       });
 
-    // ઓનલાઇન સ્ટેટસ
     const presenceChannel = supabase.channel(`presence_${roomId}`, {
       config: { presence: { key: currentUserId } }
     });
@@ -125,7 +154,7 @@ export default function PrivateChatScreen() {
       supabase.removeChannel(presenceChannel);
     };
 
-  }, [roomId, currentUserId, initialFetchDone]); // ✅ અહીં dependency બરાબર છે
+  }, [roomId, currentUserId, initialFetchDone, otherUser?.id]); 
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !currentUserId || !roomId || !otherUser.id) return;
@@ -137,7 +166,8 @@ export default function PrivateChatScreen() {
       room_id: roomId, 
       sender_id: currentUserId, 
       receiver_id: otherUser.id, 
-      content: tempMessage
+      content: tempMessage,
+      is_read: false // ✅ ડિફોલ્ટ Unread રહેશે
     }]);
 
     if (error) {
@@ -204,7 +234,15 @@ export default function PrivateChatScreen() {
                     <span className="text-[10px] text-gray-500 uppercase">
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                     </span>
-                    {isMe && <CheckCheck size={14} className="text-blue-500" />}
+                    
+                    {/* ✅ અહી Blue Tick નું Logic લગાવ્યું છે */}
+                    {isMe && (
+                      <CheckCheck 
+                        size={14} 
+                        className={msg.is_read ? "text-blue-500" : "text-gray-400"} 
+                      />
+                    )}
+
                   </div>
                 </div>
               </div>
