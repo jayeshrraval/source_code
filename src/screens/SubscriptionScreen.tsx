@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Crown, Zap, ArrowLeft, Info, Heart } from 'lucide-react';
+import { Check, Crown, Zap, ArrowLeft, Info, Heart, Loader2 } from 'lucide-react'; // Loader2 ઉમેર્યું
 import { motion } from 'framer-motion';
 import BottomNav from '../components/BottomNav';
+import { supabase } from '../supabaseClient'; // ✅ Supabase Import
+import * as WebBrowser from 'expo-web-browser'; // ✅ Browser Import
 
 export default function SubscriptionScreen() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false); // ✅ Loading State
 
   const plans = [
     {
@@ -13,6 +16,7 @@ export default function SubscriptionScreen() {
       name: 'માસિક મેમ્બરશીપ ફી',
       nameEn: 'Monthly Membership Fee',
       price: '₹49',
+      amount: 49, // ✅ ગણતરી માટે અલગ નંબર રાખ્યો
       period: '/મહિનો',
       color: 'from-mint to-teal-500',
       icon: Zap,
@@ -23,6 +27,7 @@ export default function SubscriptionScreen() {
       name: 'વાર્ષિક મેમ્બરશીપ ફી',
       nameEn: 'Yearly Membership Fee',
       price: '₹480',
+      amount: 480, // ✅ ગણતરી માટે અલગ નંબર રાખ્યો
       period: '/વર્ષ',
       color: 'from-royal-gold to-yellow-600',
       icon: Crown,
@@ -46,8 +51,56 @@ export default function SubscriptionScreen() {
     'Ad-free experience',
   ];
 
-  const handleSubscribe = (planName: string) => {
-    alert(`તમે ${planName} પસંદ કર્યો છે. પેમેન્ટ સુવિધા ટૂંક સમયમાં શરૂ થશે.`);
+  // 🔥 Payment Logic Here
+  const handleSubscribe = async (plan) => {
+    try {
+      setLoading(true);
+
+      // ૧. યુઝર લોગિન છે કે નહીં?
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("પહેલા લોગિન કરો.");
+        setLoading(false);
+        return;
+      }
+
+      // ૨. યુઝરનો મોબાઈલ નંબર (ડેટાબેઝ અથવા મેટાડેટામાંથી)
+      const userMobile = user.user_metadata?.mobile || "9999999999";
+
+      console.log(`Starting Payment: ${plan.price} for ${userMobile}`);
+
+      // ૩. Supabase Edge Function ને કોલ કરો (Backend)
+      const { data, error } = await supabase.functions.invoke('phonepe-init', {
+        body: { 
+            amount: plan.amount, // પ્લાનની રકમ (49 or 480)
+            mobileNumber: userMobile 
+        }
+      });
+
+      if (error) {
+        throw new Error("સર્વર કનેક્શનમાં ભૂલ છે.");
+      }
+
+      // ૪. જો લિંક મળે તો પેમેન્ટ પેજ ખોલો
+      if (data?.success && data?.url) {
+        await WebBrowser.openBrowserAsync(data.url);
+        
+        // પેમેન્ટ કરીને પાછા આવે ત્યારે
+        if(window.confirm("શું તમે પેમેન્ટ પૂરું કર્યું?")) {
+            // અહીં તમે સ્ટેટસ ચેક કરી શકો છો
+            alert("તમારું પેમેન્ટ પ્રોસેસ થઈ રહ્યું છે. થોડી વારમાં પ્લાન એક્ટિવ થઈ જશે.");
+            navigate('/home');
+        }
+      } else {
+        alert("પેમેન્ટ લિંક મળી નથી. ફરી પ્રયાસ કરો.");
+      }
+
+    } catch (error) {
+      console.error(error);
+      alert("ભૂલ: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -134,10 +187,15 @@ export default function SubscriptionScreen() {
               </div>
 
               <button 
-                onClick={() => handleSubscribe(plan.name)}
-                className={`w-full bg-gradient-to-r ${plan.color} text-white font-gujarati font-semibold py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95`}
+                onClick={() => handleSubscribe(plan)}
+                disabled={loading}
+                className={`w-full bg-gradient-to-r ${plan.color} text-white font-gujarati font-semibold py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2`}
               >
-                સભ્યપદ મેળવો
+                {loading ? (
+                    <>
+                        <Loader2 className="animate-spin w-5 h-5" /> પ્રોસેસ થાય છે...
+                    </>
+                ) : "સભ્યપદ મેળવો"}
               </button>
             </motion.div>
           );
