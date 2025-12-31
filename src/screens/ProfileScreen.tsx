@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import { supabase } from '../supabaseClient';
+// ✅ નવો ઈમ્પોર્ટ: ઈમેજ કોમ્પ્રેસ કરવા માટે
+import imageCompression from 'browser-image-compression';
 
 export default function ProfileScreen() {
   const navigate = useNavigate();
@@ -15,13 +17,13 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
 
   // User State
-  const [userSession, setUserSession] = useState<any>(null);
+  const [userSession, setUserSession] = useState(null);
   const [profile, setProfile] = useState({
     id: '',
     full_name: '',
     mobile: '',
     avatar_url: '',
-    dob: '' // ✅ જન્મ તારીખ માટે સ્ટેટ ઉમેર્યું
+    dob: '' 
   });
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function ProfileScreen() {
           full_name: data.full_name || '',
           mobile: data.mobile || user.email?.split('@')[0] || '',
           avatar_url: data.avatar_url || '',
-          dob: data.dob || '' // ✅ ડેટાબેઝમાંથી DOB લાવ્યા
+          dob: data.dob || ''
         });
       }
     } catch (error) {
@@ -68,20 +70,33 @@ export default function ProfileScreen() {
     }
   };
 
-  // 📸 Image Upload
-  const handleImageUpload = async (event: any) => {
+  // 📸 Image Upload (Updated with Compression)
+  const handleImageUpload = async (event) => {
     try {
       setUploading(true);
       const file = event.target.files[0];
       if (!file) return;
 
+      // --- 📉 COMPRESSION LOGIC START (100KB Limit) ---
+      const options = {
+        maxSizeMB: 0.1,          // 0.1 MB = 100 KB
+        maxWidthOrHeight: 1024,  // ફોટો રીસાઈઝ થશે
+        useWebWorker: true,
+      };
+
+      console.log(`Original Size: ${file.size / 1024} KB`);
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Compressed Size: ${compressedFile.size / 1024} KB`);
+      // --- 📉 COMPRESSION LOGIC END ---
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${profile.id}/${fileName}`;
 
+      // ✅ Upload compressedFile instead of file
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file);
+        .upload(filePath, compressedFile);
 
       if (uploadError) throw uploadError;
 
@@ -105,7 +120,6 @@ export default function ProfileScreen() {
   // 💾 Save Details (Name + DOB)
   const handleSaveDetails = async () => {
     setSaving(true);
-    // ✅ નામ અને જન્મ તારીખ બંને સેવ થશે
     await updateProfileInDB({ 
         full_name: profile.full_name,
         dob: profile.dob 
@@ -115,7 +129,7 @@ export default function ProfileScreen() {
   };
 
   // Helper to update DB
-  const updateProfileInDB = async (updates: any) => {
+  const updateProfileInDB = async (updates) => {
     if (!userSession) return;
     const { error } = await supabase
         .from('users')
@@ -181,7 +195,7 @@ export default function ProfileScreen() {
                     <Phone className="w-3 h-3 mr-1" /> +91 {profile.mobile}
                 </p>
 
-                {/* ✅ DOB Input (New Feature) */}
+                {/* DOB Input */}
                 <div className="flex items-center justify-center space-x-2">
                     <div className="flex items-center bg-white/20 px-3 py-1.5 rounded-lg">
                         <Calendar className="w-3 h-3 text-white mr-2" />
@@ -264,7 +278,7 @@ export default function ProfileScreen() {
 }
 
 // Helper Component for Menu Items
-function MenuItem({ icon: Icon, title, subtitle, color, bg, onClick }: any) {
+function MenuItem({ icon: Icon, title, subtitle, color, bg, onClick }) {
     return (
         <button onClick={onClick} className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left">
             <div className="flex items-center space-x-4">

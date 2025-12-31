@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import { supabase } from '../supabaseClient';
+// ✅ નવો ઈમ્પોર્ટ: ઈમેજ કોમ્પ્રેસ કરવા માટે
+import imageCompression from 'browser-image-compression';
 
 type TabType = 'list' | 'detail' | 'myprofile';
 
@@ -26,9 +28,9 @@ export default function MatrimonyScreen() {
     mother_name: '',
     peta_atak: '',
     mother_peta_atak: '',
-    nani_peta_atak: '', // ✅ New Added
-    dadi_peta_atak: '', // ✅ New Added
-    mosal_gam: '',      // ✅ New Added
+    nani_peta_atak: '', 
+    dadi_peta_atak: '', 
+    mosal_gam: '',      
     gol: '',
     age: '',
     marital_status: 'અપરિણીત',
@@ -66,10 +68,9 @@ export default function MatrimonyScreen() {
         return;
       }
 
-      // ૨. લોગીન યુઝરનો મોબાઈલ નંબર મેળવો (ઈમેઈલ કે ફોન ગમે તેમાંથી)
+      // ૨. લોગીન યુઝરનો મોબાઈલ નંબર મેળવો
       let rawPhone = user.phone || user.email || user.user_metadata?.mobile_number || '';
       
-      // ✅ પાવરફુલ ક્લીનિંગ: ફક્ત છેલ્લા ૧૦ આંકડા જ પકડશે
       const cleanPhone = rawPhone.replace(/[^0-9]/g, '').slice(-10);
 
       if (!cleanPhone || cleanPhone.length < 10) {
@@ -80,7 +81,6 @@ export default function MatrimonyScreen() {
 
       console.log("Checking family for phone:", cleanPhone);
 
-      // ૩. ✅ સુધારો: 'families' ટેબલમાં સર્ચ (હેડ અથવા મેમ્બર મોબાઈલ બંનેમાં)
       const { data: familyRows } = await supabase
         .from('families')
         .select('*')
@@ -92,7 +92,6 @@ export default function MatrimonyScreen() {
         setIsFamilyVerified(true);
         setFamilyData(member);
         
-        // ૪. ✅ ડેટા ઓટોમેટિક ભરી દો (ફેમિલી ટેબલમાંથી)
         setFormData(prev => ({
           ...prev,
           full_name: member.member_name || member.head_name || '',
@@ -101,11 +100,10 @@ export default function MatrimonyScreen() {
           taluka: member.taluko || '',
           district: member.district || '',
           gol: member.gol || '',
-          // જો જન્મતારીખ હોય તો ઉંમર ગણશે
           age: member.dob ? calculateAge(member.dob) : '' 
         }));
       } else {
-        setIsFamilyVerified(false); // ❌ નંબર મેચ ના થયો
+        setIsFamilyVerified(false); 
       }
 
     } catch (error) {
@@ -165,20 +163,40 @@ export default function MatrimonyScreen() {
     }
   };
 
+  // ✅ Updated Image Upload with Compression (500KB Limit)
   const handleImageUpload = async (event: any) => {
       try {
       setUploading(true);
       const file = event.target.files[0];
       if (!file) return;
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // --- 📉 COMPRESSION LOGIC START (500KB Limit for Matrimony) ---
+      const options = {
+        maxSizeMB: 0.5,          // 0.5 MB = 500 KB (Good Quality)
+        maxWidthOrHeight: 1280,  // ફોટો મોટો દેખાશે
+        useWebWorker: true,
+      };
+
+      console.log(`Original Size: ${file.size / 1024} KB`);
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Compressed Size: ${compressedFile.size / 1024} KB`);
+      // --- 📉 COMPRESSION LOGIC END ---
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
       const filePath = `matrimony/${fileName}`;
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+
+      // ✅ Upload compressedFile
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, compressedFile);
+      
       if (uploadError) throw uploadError;
+      
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
       setFormData(prev => ({ ...prev, image_url: publicUrl }));
+      
       alert('ફોટો અપલોડ થઈ ગયો!');
     } catch (error: any) {
       alert('અપલોડમાં ભૂલ: ' + error.message);
@@ -347,7 +365,6 @@ export default function MatrimonyScreen() {
                         <input type="text" value={formData.mother_peta_atak} onChange={(e) => setFormData({...formData, mother_peta_atak: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-2xl font-bold text-gray-700 mt-1 shadow-inner border-none outline-none focus:ring-2 focus:ring-pink-500" placeholder="માતાની પેટા અટક લખો" />
                     </div>
 
-                    {/* ✅ New Added Fields */}
                     <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">નાનીની પેટા અટક (Optional)</label>
                         <input type="text" value={formData.nani_peta_atak} onChange={(e) => setFormData({...formData, nani_peta_atak: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-2xl font-bold text-gray-700 mt-1 shadow-inner border-none outline-none focus:ring-2 focus:ring-pink-500" placeholder="નાનીની અટક" />

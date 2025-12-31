@@ -17,6 +17,7 @@
     "@headlessui/react": "^1.7.18",
     "@supabase/supabase-js": "^2.47.10",
     "ai": "^4.0.0",
+    "browser-image-compression": "^2.0.2",
     "cannon-es": "^0.20.0",
     "clsx": "^2.1.0",
     "emoji-picker-react": "^4.16.1",
