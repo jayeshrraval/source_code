@@ -1,9 +1,8 @@
 {
   "expo": {
-    "extra": {
-      "eas": {
-        "projectId": "75da94a4-2ac2-4eef-8d76-8ac2a43261a3"
-      }
-    }
+    "name": "Yogi Samaj Sambandh",
+    "slug": "yogi-samaj-sambandh",
+    "version": "1.0.0"
+    // બાકીના સેટિંગ્સ અહીં હશે, પણ "extra" વાળો ભાગ નથી રાખવાનો
   }
 }
