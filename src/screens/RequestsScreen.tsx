@@ -9,9 +9,9 @@ import { supabase } from '../supabaseClient';
 
 export default function RequestsScreen() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'received' | 'connected'>('received');
-  const [requests, setRequests] = useState<any[]>([]);
-  const [connections, setConnections] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('received');
+  const [requests, setRequests] = useState([]);
+  const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -88,60 +88,107 @@ export default function RequestsScreen() {
     }
   };
 
-  // 🔥 [NEW] જાસૂસી લોજિક: બંને પક્ષના પરિવારને જાણ કરો 🔥
-  const notifyFamiliesOnAccept = async (accepterId: string, senderId: string) => {
+  // 🔥 [UPDATED 100% FIX] જાસૂસી લોજિક: સ્માર્ટ મોબાઈલ મેચિંગ સાથે 🔥
+  const notifyFamiliesOnAccept = async (accepterId, senderId) => {
     try {
-        // ૧. બંને યુઝરની વિગતો મેળવો (નામ અને ગામ માટે)
-        // આપણે Matrimony Profile માંથી ડેટા લઈશું કારણ કે ત્યાં ગામનું નામ હોય છે
-        const { data: accepterProfile } = await supabase.from('matrimony_profiles').select('*').eq('user_id', accepterId).single();
-        const { data: senderProfile } = await supabase.from('matrimony_profiles').select('*').eq('user_id', senderId).single();
+        console.log("Starting Spy Logic...");
 
-        // જો પ્રોફાઈલ ના મળે તો યુઝર ટેબલમાંથી નામ લો (Fallback)
+        // ૧. બંને યુઝરની વિગતો મેળવો
         const { data: accepterUser } = await supabase.from('users').select('mobile, full_name').eq('id', accepterId).single();
         const { data: senderUser } = await supabase.from('users').select('mobile, full_name').eq('id', senderId).single();
 
-        const accepterName = accepterProfile?.full_name || accepterUser?.full_name || 'User';
-        const accepterVillage = accepterProfile?.village || '';
-        const senderName = senderProfile?.full_name || senderUser?.full_name || 'User';
-        const senderVillage = senderProfile?.village || '';
+        // પ્રોફાઈલ ડેટા (ગામના નામ માટે)
+        const { data: accepterProfile } = await supabase.from('matrimony_profiles').select('full_name, village').eq('user_id', accepterId).maybeSingle();
+        const { data: senderProfile } = await supabase.from('matrimony_profiles').select('full_name, village').eq('user_id', senderId).maybeSingle();
+
+        const accName = accepterProfile?.full_name || accepterUser?.full_name || 'User';
+        const accVillage = accepterProfile?.village || '';
+        const sendName = senderProfile?.full_name || senderUser?.full_name || 'User';
+        const sendVillage = senderProfile?.village || '';
+
+        // 🛠️ helper: છેલ્લા ૧૦ આંકડા કાઢવા માટે (+91 હોય તો પણ ચાલે)
+        const getLast10 = (str) => {
+            if (!str) return '';
+            return str.replace(/\D/g, '').slice(-10);
+        };
 
         const notifications = [];
 
-        // --- PART A: સ્વીકારનાર (Accepter) ના પરિવારને જાણ કરો ---
+        // --- PART A: સ્વીકારનાર (Jayesh) ના પરિવારને જાણ કરો ---
         if (accepterUser?.mobile) {
-             const { data: familyRow } = await supabase.from('families').select('*')
-                .or(`mobile_number.ilike.%${accepterUser.mobile}%,member_mobile.ilike.%${accepterUser.mobile}%`).limit(1).maybeSingle();
+             const cleanMobile = getLast10(accepterUser.mobile);
+             console.log("Searching Family for Accepter (Clean):", cleanMobile);
+
+             // ડેટાબેઝમાંથી બધા ફેમિલી લાવો (કારણ કે SQL query માં clean કરવું અઘરું છે)
+             // ચિંતા ના કરો, આ ઝડપી જ થશે.
+             const { data: allFamilies } = await supabase.from('families').select('mobile_number, member_mobile');
+
+             // JS માં શોધો (Perfect Match)
+             const familyRow = allFamilies?.find(f => 
+                getLast10(f.mobile_number) === cleanMobile || 
+                getLast10(f.member_mobile) === cleanMobile
+             );
              
              if (familyRow) {
-                 const mobiles = [familyRow.mobile_number, familyRow.member_mobile].filter(Boolean);
-                 const { data: familyUsers } = await supabase.from('users').select('id').in('mobile', mobiles).neq('id', accepterId);
+                 const familyNumbersClean = [
+                     getLast10(familyRow.mobile_number), 
+                     getLast10(familyRow.member_mobile)
+                 ].filter(Boolean);
+
+                 // હવે યુઝર્સ શોધો જેના મોબાઈલ આ લિસ્ટમાં હોય
+                 const { data: allUsers } = await supabase.from('users').select('id, mobile');
                  
+                 const familyUsers = allUsers?.filter(u => 
+                    u.mobile && 
+                    familyNumbersClean.includes(getLast10(u.mobile)) && 
+                    u.id !== accepterId
+                 );
+
                  familyUsers?.forEach(fUser => {
                      notifications.push({
                          user_id: fUser.id,
                          title: '✅ રિક્વેસ્ટ સ્વીકારાઈ',
-                         message: `તમારા ઘરના સભ્ય '${accepterName}' એ '${senderName}' (${senderVillage}) ની રિક્વેસ્ટ સ્વીકારી છે.`,
+                         message: `તમારા ઘરના સભ્ય '${accName}' એ '${sendName}' (${sendVillage}) ની રિક્વેસ્ટ સ્વીકારી છે.`,
                          type: 'success',
                          related_profile_id: senderId
                      });
                  });
+             } else {
+                 console.log("Accepter Family NOT Found in List");
              }
         }
 
-        // --- PART B: મોકલનાર (Sender) ના પરિવારને જાણ કરો ---
+        // --- PART B: મોકલનાર (Anjali) ના પરિવારને જાણ કરો ---
         if (senderUser?.mobile) {
-            const { data: familyRow } = await supabase.from('families').select('*')
-               .or(`mobile_number.ilike.%${senderUser.mobile}%,member_mobile.ilike.%${senderUser.mobile}%`).limit(1).maybeSingle();
+            const cleanMobile = getLast10(senderUser.mobile);
+            console.log("Searching Family for Sender (Clean):", cleanMobile);
+
+            const { data: allFamilies } = await supabase.from('families').select('mobile_number, member_mobile');
+
+            const familyRow = allFamilies?.find(f => 
+               getLast10(f.mobile_number) === cleanMobile || 
+               getLast10(f.member_mobile) === cleanMobile
+            );
             
             if (familyRow) {
-                const mobiles = [familyRow.mobile_number, familyRow.member_mobile].filter(Boolean);
-                const { data: familyUsers } = await supabase.from('users').select('id').in('mobile', mobiles).neq('id', senderId);
+                const familyNumbersClean = [
+                    getLast10(familyRow.mobile_number), 
+                    getLast10(familyRow.member_mobile)
+                ].filter(Boolean);
+
+                const { data: allUsers } = await supabase.from('users').select('id, mobile');
+                
+                const familyUsers = allUsers?.filter(u => 
+                   u.mobile && 
+                   familyNumbersClean.includes(getLast10(u.mobile)) && 
+                   u.id !== senderId
+                );
                 
                 familyUsers?.forEach(fUser => {
                     notifications.push({
                         user_id: fUser.id,
                         title: '🎉 અભિનંદન! રિક્વેસ્ટ સ્વીકારાઈ',
-                        message: `તમારા ઘરના સભ્ય '${senderName}' ની રિક્વેસ્ટ '${accepterName}' (${accepterVillage}) એ સ્વીકારી લીધી છે.`,
+                        message: `તમારા ઘરના સભ્ય '${sendName}' ની રિક્વેસ્ટ '${accName}' (${accVillage}) એ સ્વીકારી લીધી છે.`,
                         type: 'success',
                         related_profile_id: accepterId
                     });
@@ -152,7 +199,9 @@ export default function RequestsScreen() {
        // બધા નોટિફિકેશન એક સાથે મોકલો
        if (notifications.length > 0) {
            await supabase.from('notifications').insert(notifications);
-           console.log("Both Families Notified Successfully!");
+           console.log("Both Families Notified Successfully! Count:", notifications.length);
+       } else {
+           console.log("No family members found to notify.");
        }
 
     } catch (error) {
@@ -160,7 +209,7 @@ export default function RequestsScreen() {
     }
   };
 
-  const handleAccept = async (requestId: number, senderId: string) => {
+  const handleAccept = async (requestId, senderId) => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if(!user) return;
@@ -189,7 +238,7 @@ export default function RequestsScreen() {
         }
 
         // ✅ અહીં જાસૂસી લોજિક કોલ કર્યું (બંને પરિવારને જાણ થશે)
-        notifyFamiliesOnAccept(user.id, senderId);
+        await notifyFamiliesOnAccept(user.id, senderId);
 
         alert("રિક્વેસ્ટ સ્વીકારાઈ ગઈ!");
         fetchRequests(); 
@@ -200,7 +249,7 @@ export default function RequestsScreen() {
     }
   };
 
-  const handleReject = async (requestId: number) => {
+  const handleReject = async (requestId) => {
     if(!confirm("શું તમે આ રિક્વેસ્ટ નકારવા માંગો છો?")) return;
     try {
         await supabase.from('requests').update({ status: 'rejected' }).eq('id', requestId);
@@ -211,7 +260,7 @@ export default function RequestsScreen() {
   };
 
   // ✅ SUPER FIX: ડુપ્લિકેટ રૂમની સમસ્યા કાયમ માટે ગાયબ
-  const handleStartChat = async (otherId: string) => {
+  const handleStartChat = async (otherId) => {
     const { data: { user } } = await supabase.auth.getUser();
     if(!user) return;
 

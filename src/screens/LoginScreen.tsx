@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Smartphone, Loader2, AlertCircle } from 'lucide-react'; // Fingerprint કાઢી નાખ્યું (વપરાતું નહોતું)
-import { supabase } from '../supabaseClient'; 
+import { Smartphone, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 export default function LoginScreen() {
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  const [activeTab, setActiveTab] = useState('login'); // removed TS types for pure JS compatibility if needed, works for TS too
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
@@ -20,13 +20,13 @@ export default function LoginScreen() {
   });
 
   // Handle Input Change
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setErrorMsg(''); 
   };
 
-  // 🛠 REGISTER FUNCTION
-  const handleRegister = async (e: React.FormEvent) => {
+  // 🛠 REGISTER FUNCTION (FIXED)
+  const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
@@ -47,6 +47,7 @@ export default function LoginScreen() {
       // Supabase માટે ફેક ઈમેલ બનાવો
       const fakeEmail = `${formData.mobile}@samaj.app`;
 
+      // ૧. Auth માં સાઈન અપ કરો
       const { data, error } = await supabase.auth.signUp({
         email: fakeEmail,
         password: formData.password,
@@ -61,9 +62,28 @@ export default function LoginScreen() {
 
       if (error) throw error;
 
+      // ૨. 🔥 [IMP FIX] Users ટેબલમાં ડેટા નાખો (જેથી પ્રોફાઈલમાં દેખાય)
+      if (data.user) {
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert([{
+                id: data.user.id,
+                full_name: formData.fullName,
+                mobile: formData.mobile,
+                dob: formData.dob, // ✅ DOB અહી સેવ થશે
+                created_at: new Date()
+            }]);
+
+          if (insertError) {
+              // જો ઇન્સેર્ટ ના થાય, તો લોગ કરીને એરર બતાવો
+              console.error("Users Table Insert Error:", insertError);
+              throw insertError; 
+          }
+      }
+
       alert('રજીસ્ટ્રેશન સફળ! હવે લોગિન કરો.');
       setActiveTab('login');
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
       setErrorMsg(error.message || 'રજીસ્ટ્રેશનમાં ભૂલ છે.');
     } finally {
@@ -72,7 +92,7 @@ export default function LoginScreen() {
   };
 
   // 🔐 LOGIN FUNCTION
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
@@ -87,7 +107,7 @@ export default function LoginScreen() {
 
       if (error) throw error;
       navigate('/home');
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
       setErrorMsg('મોબાઈલ નંબર અથવા પાસવર્ડ ખોટો છે.');
     } finally {
