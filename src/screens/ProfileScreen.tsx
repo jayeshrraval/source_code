@@ -269,7 +269,7 @@ export default function ProfileScreen() {
             <span>લોગ આઉટ કરો</span>
         </button>
 
-        <p className="text-center text-gray-400 text-xs mt-4">Version 1.0.0 • Yogi Samaj App</p>
+        <p className="text-center text-gray-400 text-xs mt-4">Version 1.0.0 • યોગી સમાજ સંબંધ</p>
       </div>
 
       <BottomNav />

@@ -88,16 +88,16 @@ export default function RequestsScreen() {
     }
   };
 
-  // 🔥 [UPDATED 100% FIX] જાસૂસી લોજિક: સ્માર્ટ મોબાઈલ મેચિંગ સાથે 🔥
-  const notifyFamiliesOnAccept = async (accepterId, senderId) => {
+  // 🔥 [FINAL UPDATED FIX] જાસૂસી લોજિક: આખા પરિવારને (Group) શોધશે 🔥
+  const notifyFamiliesOnAccept = async (accepterId: any, senderId: any) => {
     try {
-        console.log("Starting Spy Logic...");
+        console.log("Starting Spy Logic (Group Version)...");
 
-        // ૧. બંને યુઝરની વિગતો મેળવો
+        // ૧. બંને યુઝરના મોબાઈલ મેળવો
         const { data: accepterUser } = await supabase.from('users').select('mobile, full_name').eq('id', accepterId).single();
         const { data: senderUser } = await supabase.from('users').select('mobile, full_name').eq('id', senderId).single();
 
-        // પ્રોફાઈલ ડેટા (ગામના નામ માટે)
+        // પ્રોફાઈલ ડેટા
         const { data: accepterProfile } = await supabase.from('matrimony_profiles').select('full_name, village').eq('user_id', accepterId).maybeSingle();
         const { data: senderProfile } = await supabase.from('matrimony_profiles').select('full_name, village').eq('user_id', senderId).maybeSingle();
 
@@ -106,42 +106,67 @@ export default function RequestsScreen() {
         const sendName = senderProfile?.full_name || senderUser?.full_name || 'User';
         const sendVillage = senderProfile?.village || '';
 
-        // 🛠️ helper: છેલ્લા ૧૦ આંકડા કાઢવા માટે (+91 હોય તો પણ ચાલે)
-        const getLast10 = (str) => {
+        // Helper: Clean Mobile
+        const getLast10 = (str: any) => {
             if (!str) return '';
             return str.replace(/\D/g, '').slice(-10);
         };
 
         const notifications = [];
 
-        // --- PART A: સ્વીકારનાર (Jayesh) ના પરિવારને જાણ કરો ---
+        // ==================================================
+        // 🛠️ હેલ્પર: મોબાઈલ પરથી આખા ફેમિલી ગ્રુપના નંબર લાવે
+        // ==================================================
+        const getFamilyGroupMobiles = async (userMobile: string) => {
+            const cleanUserMobile = getLast10(userMobile);
+            console.log(`Searching Family Group for: ${cleanUserMobile}`);
+
+            // ૧. પહેલા 'families' માંથી આ મોબાઈલ વાળી લાઈન શોધો
+            const { data: allFamilies } = await supabase.from('families').select('*');
+            
+            const myFamilyRow = allFamilies?.find(f => 
+                getLast10(f.mobile_number) === cleanUserMobile || 
+                getLast10(f.member_mobile) === cleanUserMobile
+            );
+
+            if (!myFamilyRow) {
+                console.log("No family record found for this mobile.");
+                return [];
+            }
+
+            // ૨. હવે એ લાઈનનો 'user_id' (Family ID) પકડો
+            const familyGroupId = myFamilyRow.user_id;
+            console.log(`Found Family Group ID: ${familyGroupId}`);
+
+            // ૩. એ Group ID વાળા *બધા* સભ્યોને શોધો
+            const groupMembers = allFamilies?.filter(f => f.user_id === familyGroupId);
+
+            // ૪. બધાના નંબરનું લિસ્ટ બનાવો
+            let allNumbers: string[] = [];
+            groupMembers?.forEach(m => {
+                if (m.mobile_number) allNumbers.push(getLast10(m.mobile_number));
+                if (m.member_mobile) allNumbers.push(getLast10(m.member_mobile));
+            });
+
+            // ડુપ્લિકેટ નંબર કાઢી નાખો
+            return [...new Set(allNumbers)];
+        };
+
+        // ==================================================
+        // PART A: સ્વીકારનાર (Accepter) ના પરિવારને જાણ કરો
+        // ==================================================
         if (accepterUser?.mobile) {
-             const cleanMobile = getLast10(accepterUser.mobile);
-             console.log("Searching Family for Accepter (Clean):", cleanMobile);
+             const familyNumbers = await getFamilyGroupMobiles(accepterUser.mobile);
+             console.log("Accepter Family Numbers:", familyNumbers);
 
-             // ડેટાબેઝમાંથી બધા ફેમિલી લાવો (કારણ કે SQL query માં clean કરવું અઘરું છે)
-             // ચિંતા ના કરો, આ ઝડપી જ થશે.
-             const { data: allFamilies } = await supabase.from('families').select('mobile_number, member_mobile');
-
-             // JS માં શોધો (Perfect Match)
-             const familyRow = allFamilies?.find(f => 
-                getLast10(f.mobile_number) === cleanMobile || 
-                getLast10(f.member_mobile) === cleanMobile
-             );
-             
-             if (familyRow) {
-                 const familyNumbersClean = [
-                     getLast10(familyRow.mobile_number), 
-                     getLast10(familyRow.member_mobile)
-                 ].filter(Boolean);
-
-                 // હવે યુઝર્સ શોધો જેના મોબાઈલ આ લિસ્ટમાં હોય
+             if (familyNumbers.length > 0) {
+                 // એપમાં રજીસ્ટર થયેલા યુઝર્સ શોધો
                  const { data: allUsers } = await supabase.from('users').select('id, mobile');
                  
                  const familyUsers = allUsers?.filter(u => 
                     u.mobile && 
-                    familyNumbersClean.includes(getLast10(u.mobile)) && 
-                    u.id !== accepterId
+                    familyNumbers.includes(getLast10(u.mobile)) && 
+                    u.id !== accepterId // પોતાને મેસેજ ન મોકલો
                  );
 
                  familyUsers?.forEach(fUser => {
@@ -150,38 +175,26 @@ export default function RequestsScreen() {
                          title: '✅ રિક્વેસ્ટ સ્વીકારાઈ',
                          message: `તમારા ઘરના સભ્ય '${accName}' એ '${sendName}' (${sendVillage}) ની રિક્વેસ્ટ સ્વીકારી છે.`,
                          type: 'success',
-                         related_profile_id: senderId
+                         related_user_id: senderId
                      });
                  });
-             } else {
-                 console.log("Accepter Family NOT Found in List");
              }
         }
 
-        // --- PART B: મોકલનાર (Anjali) ના પરિવારને જાણ કરો ---
+        // ==================================================
+        // PART B: મોકલનાર (Sender) ના પરિવારને જાણ કરો
+        // ==================================================
         if (senderUser?.mobile) {
-            const cleanMobile = getLast10(senderUser.mobile);
-            console.log("Searching Family for Sender (Clean):", cleanMobile);
-
-            const { data: allFamilies } = await supabase.from('families').select('mobile_number, member_mobile');
-
-            const familyRow = allFamilies?.find(f => 
-               getLast10(f.mobile_number) === cleanMobile || 
-               getLast10(f.member_mobile) === cleanMobile
-            );
+            const familyNumbers = await getFamilyGroupMobiles(senderUser.mobile);
+            console.log("Sender Family Numbers:", familyNumbers);
             
-            if (familyRow) {
-                const familyNumbersClean = [
-                    getLast10(familyRow.mobile_number), 
-                    getLast10(familyRow.member_mobile)
-                ].filter(Boolean);
-
+            if (familyNumbers.length > 0) {
                 const { data: allUsers } = await supabase.from('users').select('id, mobile');
                 
                 const familyUsers = allUsers?.filter(u => 
                    u.mobile && 
-                   familyNumbersClean.includes(getLast10(u.mobile)) && 
-                   u.id !== senderId
+                   familyNumbers.includes(getLast10(u.mobile)) && 
+                   u.id !== senderId // પોતાને મેસેજ ન મોકલો
                 );
                 
                 familyUsers?.forEach(fUser => {
@@ -190,18 +203,18 @@ export default function RequestsScreen() {
                         title: '🎉 અભિનંદન! રિક્વેસ્ટ સ્વીકારાઈ',
                         message: `તમારા ઘરના સભ્ય '${sendName}' ની રિક્વેસ્ટ '${accName}' (${accVillage}) એ સ્વીકારી લીધી છે.`,
                         type: 'success',
-                        related_profile_id: accepterId
+                        related_user_id: accepterId
                     });
                 });
             }
        }
 
-       // બધા નોટિફિકેશન એક સાથે મોકલો
+       // Final Insert
        if (notifications.length > 0) {
            await supabase.from('notifications').insert(notifications);
-           console.log("Both Families Notified Successfully! Count:", notifications.length);
+           console.log("Success! Family Notifications Sent:", notifications.length);
        } else {
-           console.log("No family members found to notify.");
+           console.log("No valid family members found on the app to notify.");
        }
 
     } catch (error) {
@@ -209,7 +222,7 @@ export default function RequestsScreen() {
     }
   };
 
-  const handleAccept = async (requestId, senderId) => {
+  const handleAccept = async (requestId: any, senderId: any) => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if(!user) return;
@@ -249,7 +262,7 @@ export default function RequestsScreen() {
     }
   };
 
-  const handleReject = async (requestId) => {
+  const handleReject = async (requestId: any) => {
     if(!confirm("શું તમે આ રિક્વેસ્ટ નકારવા માંગો છો?")) return;
     try {
         await supabase.from('requests').update({ status: 'rejected' }).eq('id', requestId);
@@ -260,7 +273,7 @@ export default function RequestsScreen() {
   };
 
   // ✅ SUPER FIX: ડુપ્લિકેટ રૂમની સમસ્યા કાયમ માટે ગાયબ
-  const handleStartChat = async (otherId) => {
+  const handleStartChat = async (otherId: any) => {
     const { data: { user } } = await supabase.auth.getUser();
     if(!user) return;
 
@@ -343,7 +356,7 @@ export default function RequestsScreen() {
                                 <p className="text-gray-500 font-bold">કોઈ નવી રિક્વેસ્ટ નથી.</p>
                             </div>
                         ) : (
-                            requests.map((req) => (
+                            requests.map((req: any) => (
                                 <div key={req.id} className="bg-white p-6 rounded-[35px] shadow-sm flex items-center justify-between">
                                     <div className="flex items-center space-x-5">
                                         <img 
@@ -372,7 +385,7 @@ export default function RequestsScreen() {
                                 <p className="text-gray-500 font-bold">કોઈ ચેટ નથી.</p>
                             </div>
                         ) : (
-                            connections.map((conn) => (
+                            connections.map((conn: any) => (
                                 <div key={conn.id} className="bg-white p-6 rounded-[35px] shadow-sm flex items-center justify-between">
                                     <div className="flex items-center space-x-5">
                                         <img 

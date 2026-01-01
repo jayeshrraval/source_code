@@ -5,7 +5,7 @@ import { Smartphone, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 export default function LoginScreen() {
-  const [activeTab, setActiveTab] = useState('login'); // removed TS types for pure JS compatibility if needed, works for TS too
+  const [activeTab, setActiveTab] = useState('login');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ export default function LoginScreen() {
     mobile: '',
     password: '',
     confirmPassword: '',
-    dob: ''
+    dob: '' // ✅ DOB State
   });
 
   // Handle Input Change
@@ -25,7 +25,7 @@ export default function LoginScreen() {
     setErrorMsg(''); 
   };
 
-  // 🛠 REGISTER FUNCTION (FIXED)
+  // 🛠 REGISTER FUNCTION (UPDATED)
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -62,11 +62,11 @@ export default function LoginScreen() {
 
       if (error) throw error;
 
-      // ૨. 🔥 [IMP FIX] Users ટેબલમાં ડેટા નાખો (જેથી પ્રોફાઈલમાં દેખાય)
+      // ૨. 🔥 Users ટેબલમાં ડેટા નાખો (DOB સાથે)
       if (data.user) {
-          const { error: insertError } = await supabase
-            .from('users')
-            .insert([{
+          const { error: dbError } = await supabase
+            .from('users') // ખાતરી કરજો કે ટેબલનું નામ 'users' જ છે
+            .upsert([{     // ✅ અહીં .insert ની જગ્યાએ .upsert વાપર્યું છે (વધારે સુરક્ષિત)
                 id: data.user.id,
                 full_name: formData.fullName,
                 mobile: formData.mobile,
@@ -74,10 +74,9 @@ export default function LoginScreen() {
                 created_at: new Date()
             }]);
 
-          if (insertError) {
-              // જો ઇન્સેર્ટ ના થાય, તો લોગ કરીને એરર બતાવો
-              console.error("Users Table Insert Error:", insertError);
-              throw insertError; 
+          if (dbError) {
+              console.error("Users Table Update Error:", dbError);
+              throw dbError; 
           }
       }
 

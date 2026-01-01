@@ -201,7 +201,7 @@ export default function HomeScreen() {
                 <h1 className="text-white font-bold text-xl tracking-tight">
                   {loading ? t('તૈયાર થઈ રહ્યું છે...', 'Loading...') : `${t('નમસ્તે', 'Hello')}, ${userName}`}
                 </h1>
-                <p className="text-mint text-xs font-medium uppercase tracking-widest">Yogi Samaj Connect</p>
+                <p className="text-mint text-xs font-medium uppercase tracking-widest">Community Connection</p>
               </div>
             </div>
             <div className="flex space-x-3">

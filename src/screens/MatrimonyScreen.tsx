@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Heart, Loader2, User, MapPin, Briefcase, GraduationCap, Camera, Bell, ArrowLeft, Users, Lock, CheckCircle, Home } from 'lucide-react';
+import { Search, Heart, Loader2, User, MapPin, Briefcase, GraduationCap, Camera, Bell, ArrowLeft, Users, Lock, CheckCircle, Home, Filter, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import { supabase } from '../supabaseClient';
-// ✅ નવો ઈમ્પોર્ટ: ઈમેજ કોમ્પ્રેસ કરવા માટે
 import imageCompression from 'browser-image-compression';
 
 type TabType = 'list' | 'detail' | 'myprofile';
@@ -21,6 +20,17 @@ export default function MatrimonyScreen() {
   // ✅ ફેમિલી વેરીફીકેશન સ્ટેટ
   const [isFamilyVerified, setIsFamilyVerified] = useState<boolean | null>(null);
   const [familyData, setFamilyData] = useState<any>(null);
+
+  // 🔥 SEARCH & FILTER STATE 🔥
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    minAge: 18,
+    maxAge: 60,
+    maritalStatus: '',
+    gol: '',
+    district: ''
+  });
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -48,13 +58,12 @@ export default function MatrimonyScreen() {
     checkFamilyAndProfileStatus();
   }, []);
 
-  // 🔥 સુધારેલું લોજિક: મોબાઈલ નંબરથી મેચિંગ અને ઓટો-ફિલ 🔥
+  // 🔥 મોબાઈલ નંબરથી મેચિંગ અને ઓટો-ફિલ
   const checkFamilyAndProfileStatus = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // ૧. પહેલા ચેક કરો કે મેટ્રિમોની પ્રોફાઈલ છે કે નહીં?
       const { data: matProfile } = await supabase
         .from('matrimony_profiles')
         .select('*')
@@ -68,9 +77,7 @@ export default function MatrimonyScreen() {
         return;
       }
 
-      // ૨. લોગીન યુઝરનો મોબાઈલ નંબર મેળવો
       let rawPhone = user.phone || user.email || user.user_metadata?.mobile_number || '';
-      
       const cleanPhone = rawPhone.replace(/[^0-9]/g, '').slice(-10);
 
       if (!cleanPhone || cleanPhone.length < 10) {
@@ -78,8 +85,6 @@ export default function MatrimonyScreen() {
         setIsFamilyVerified(false);
         return;
       }
-
-      console.log("Checking family for phone:", cleanPhone);
 
       const { data: familyRows } = await supabase
         .from('families')
@@ -129,49 +134,80 @@ export default function MatrimonyScreen() {
     setLoading(false);
   };
 
-  // 🔥 [NEW] ફંક્શન: પરિવારને જાણ કરો (JASUSI LOGIC) 🔥
-  const notifyFamilyMembers = async (senderId, receiverProfile) => {
+  // ============================================================
+  // 🔥 FAMILY NOTIFICATION SYSTEM (UNCHANGED) 🔥
+  // ============================================================
+
+  const getFamilyMobileNumbers = async (userMobile: string) => {
+    const { data: familyEntry } = await supabase
+      .from('families')
+      .select('user_id')
+      .eq('member_mobile', userMobile)
+      .limit(1)
+      .maybeSingle();
+
+    if (!familyEntry) return [];
+
+    const { data: allMembers } = await supabase
+      .from('families')
+      .select('member_mobile')
+      .eq('user_id', familyEntry.user_id);
+
+    return allMembers?.map((m: any) => m.member_mobile).filter(Boolean) || [];
+  };
+
+  const notifyFamilyMembers = async (senderId: string, receiverProfile: any) => {
     try {
-        const { data: userData } = await supabase.from('users').select('mobile, full_name').eq('id', senderId).single();
-        if (!userData || !userData.mobile) return;
+        const { data: senderUser } = await supabase.from('users').select('mobile, full_name').eq('id', senderId).single();
+        const { data: senderMatrimony } = await supabase.from('matrimony_profiles').select('full_name').eq('user_id', senderId).single();
+        const { data: receiverUser } = await supabase.from('users').select('mobile').eq('id', receiverProfile.user_id).single();
 
-        const { data: familyRow } = await supabase
-            .from('families')
-            .select('*')
-            .or(`mobile_number.ilike.%${userData.mobile}%,member_mobile.ilike.%${userData.mobile}%`)
-            .limit(1)
-            .maybeSingle();
+        if (!senderUser?.mobile || !receiverUser?.mobile) return;
 
-        if (!familyRow) return;
+        const senderName = senderMatrimony?.full_name || senderUser.full_name;
+        const receiverName = receiverProfile.full_name;
 
-        const familyMobiles = [familyRow.mobile_number, familyRow.member_mobile].filter(Boolean);
+        const senderFamilyMobiles = await getFamilyMobileNumbers(senderUser.mobile);
+        const receiverFamilyMobiles = await getFamilyMobileNumbers(receiverUser.mobile);
 
-        const { data: familyUsers } = await supabase
-            .from('users')
-            .select('id')
-            .in('mobile', familyMobiles)
-            .neq('id', senderId);
+        const { data: senderFamilyUsers } = await supabase.from('users').select('id').in('mobile', senderFamilyMobiles);
+        const { data: receiverFamilyUsers } = await supabase.from('users').select('id').in('mobile', receiverFamilyMobiles);
 
-        if (!familyUsers || familyUsers.length === 0) return;
+        let notifications = [];
 
-        const notifications = familyUsers.map(fUser => ({
-            user_id: fUser.id,
-            title: '⚠️ નવી મેટ્રિમોની રિક્વેસ્ટ',
-            message: `તમારા ઘરના સભ્ય '${userData.full_name}' એ '${receiverProfile.full_name}' (${receiverProfile.village}) ને રિક્વેસ્ટ મોકલી છે.`,
-            type: 'alert',
-            related_profile_id: receiverProfile.user_id 
-        }));
+        senderFamilyUsers?.forEach((user: any) => {
+            if (user.id !== senderId) {
+                notifications.push({
+                    user_id: user.id,
+                    title: 'તમારા પરિવારમાંથી રિક્વેસ્ટ ગઈ',
+                    message: `${senderName} એ ${receiverName} (${receiverProfile.village}) ને રિક્વેસ્ટ મોકલી છે.`,
+                    type: 'request_sent',
+                    related_user_id: receiverProfile.user_id 
+                });
+            }
+        });
 
-        await supabase.from('notifications').insert(notifications);
-        console.log("Family Notified Successfully!");
+        receiverFamilyUsers?.forEach((user: any) => {
+            notifications.push({
+                user_id: user.id,
+                title: 'નવી રિક્વેસ્ટ આવી છે! 💍',
+                message: `${receiverName} માટે ${senderName} ની રિક્વેસ્ટ આવી છે.`,
+                type: 'request_received',
+                related_user_id: senderId
+            });
+        });
+
+        if (notifications.length > 0) {
+            await supabase.from('notifications').insert(notifications);
+        }
+
     } catch (error) {
         console.error("Family Notification Error:", error);
     }
   };
 
-  // 🔥 [UPDATED] રિક્વેસ્ટ મોકલવાનું ફંક્શન (હવે આખી પ્રોફાઇલ લે છે)
   const handleSendRequest = async (receiverProfile: any) => {
-    const receiverId = receiverProfile.user_id; // ID કાઢી લીધું
+    const receiverId = receiverProfile.user_id;
 
     if (!hasProfile) {
       alert("તમે રિક્વેસ્ટ મોકલી શકતા નથી! પહેલા 'મારી પ્રોફાઇલ' બનાવો.");
@@ -201,8 +237,7 @@ export default function MatrimonyScreen() {
 
       if (error) throw error;
 
-      // ✅ અહીં જાસૂસી લોજિક કોલ કર્યું
-      notifyFamilyMembers(user.id, receiverProfile);
+      await notifyFamilyMembers(user.id, receiverProfile);
 
       alert('રિક્વેસ્ટ સફળતાપૂર્વક મોકલાઈ ગઈ! 🎉');
     } catch (error: any) {
@@ -210,7 +245,6 @@ export default function MatrimonyScreen() {
     }
   };
 
-  // ✅ Updated Image Upload with Compression (500KB Limit)
   const handleImageUpload = async (event: any) => {
       try {
       setUploading(true);
@@ -220,23 +254,17 @@ export default function MatrimonyScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // --- 📉 COMPRESSION LOGIC START (500KB Limit for Matrimony) ---
       const options = {
-        maxSizeMB: 0.5,          // 0.5 MB = 500 KB (Good Quality)
-        maxWidthOrHeight: 1280,  // ફોટો મોટો દેખાશે
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 1280,
         useWebWorker: true,
       };
 
-      console.log(`Original Size: ${file.size / 1024} KB`);
       const compressedFile = await imageCompression(file, options);
-      console.log(`Compressed Size: ${compressedFile.size / 1024} KB`);
-      // --- 📉 COMPRESSION LOGIC END ---
-
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
       const filePath = `matrimony/${fileName}`;
 
-      // ✅ Upload compressedFile
       const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, compressedFile);
       
       if (uploadError) throw uploadError;
@@ -253,7 +281,6 @@ export default function MatrimonyScreen() {
   };
 
   const handleSaveProfile = async () => {
-      // ✅ મોસાળ ગામ ફરજિયાત ચેક
       if (!formData.mosal_gam.trim()) {
           alert('મોસાળ ગામ ભરવું ફરજિયાત છે!');
           return;
@@ -281,6 +308,34 @@ export default function MatrimonyScreen() {
     }
   };
 
+  // 🔥 FILTER LOGIC 🔥
+  const getFilteredProfiles = () => {
+    return profiles.filter((p) => {
+      // 1. Text Search (Name, Village, Peta Atak)
+      const query = searchQuery.toLowerCase();
+      const matchText = 
+        p.full_name?.toLowerCase().includes(query) ||
+        p.village?.toLowerCase().includes(query) ||
+        p.peta_atak?.toLowerCase().includes(query);
+
+      // 2. Age Filter
+      const matchAge = p.age >= filters.minAge && p.age <= filters.maxAge;
+
+      // 3. Marital Status
+      const matchStatus = filters.maritalStatus ? p.marital_status === filters.maritalStatus : true;
+
+      // 4. Gol
+      const matchGol = filters.gol ? p.gol?.includes(filters.gol) : true;
+
+      // 5. District
+      const matchDistrict = filters.district ? p.district?.includes(filters.district) : true;
+
+      return matchText && matchAge && matchStatus && matchGol && matchDistrict;
+    });
+  };
+
+  const filteredProfiles = getFilteredProfiles();
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 font-gujarati">
       <div className="bg-gradient-to-r from-pink-500 to-rose-600 px-6 py-8 shadow-lg flex justify-between items-center">
@@ -307,7 +362,111 @@ export default function MatrimonyScreen() {
       <div className="px-6 py-6">
         {activeTab === 'list' && (
           <div className="space-y-4">
-            {loading ? <Loader2 className="animate-spin mx-auto mt-10 text-pink-500" /> : profiles.length === 0 ? <p className="text-center text-gray-400 mt-10 font-bold">કોઈ પ્રોફાઇલ મળી નથી.</p> : profiles.map((profile) => (
+            
+            {/* 🔥 SEARCH BAR & FILTER BUTTON 🔥 */}
+            <div className="flex gap-2 mb-2 sticky top-[72px] z-10">
+                <div className="flex-1 bg-white border border-gray-200 rounded-2xl flex items-center px-4 py-3 shadow-sm">
+                    <Search className="text-gray-400 w-5 h-5 mr-3" />
+                    <input 
+                        type="text"
+                        placeholder="નામ, ગામ, અથવા અટક શોધો..." 
+                        className="flex-1 outline-none text-gray-700 font-bold bg-transparent"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+                <button 
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`p-3 rounded-2xl border shadow-sm transition-all ${showFilters ? 'bg-pink-600 text-white border-pink-600' : 'bg-white text-gray-500 border-gray-200'}`}
+                >
+                    <Filter className="w-6 h-6" />
+                </button>
+            </div>
+
+            {/* 🔥 ADVANCE FILTERS PANEL 🔥 */}
+            <AnimatePresence>
+                {showFilters && (
+                    <motion.div 
+                        initial={{ opacity: 0, height: 0 }} 
+                        animate={{ opacity: 1, height: 'auto' }} 
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-white rounded-[25px] border border-pink-100 p-5 shadow-sm overflow-hidden mb-4"
+                    >
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-gray-700 text-sm uppercase tracking-wide">Advance Filters</h3>
+                            <button onClick={() => setShowFilters(false)}><X className="text-gray-400 w-5 h-5" /></button>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Age Range */}
+                            <div className="col-span-2">
+                                <label className="text-xs font-bold text-gray-400 ml-1">ઉંમર (વર્ષ)</label>
+                                <div className="flex gap-4 items-center mt-1">
+                                    <input 
+                                        type="number" placeholder="Min" 
+                                        value={filters.minAge} 
+                                        onChange={(e) => setFilters({...filters, minAge: Number(e.target.value)})}
+                                        className="w-full bg-gray-50 rounded-xl px-4 py-2 font-bold text-gray-700 outline-none border border-transparent focus:border-pink-300"
+                                    />
+                                    <span className="text-gray-400 font-bold">-</span>
+                                    <input 
+                                        type="number" placeholder="Max" 
+                                        value={filters.maxAge} 
+                                        onChange={(e) => setFilters({...filters, maxAge: Number(e.target.value)})}
+                                        className="w-full bg-gray-50 rounded-xl px-4 py-2 font-bold text-gray-700 outline-none border border-transparent focus:border-pink-300"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Marital Status */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 ml-1">લગ્ન સ્થિતિ</label>
+                                <select 
+                                    value={filters.maritalStatus}
+                                    onChange={(e) => setFilters({...filters, maritalStatus: e.target.value})}
+                                    className="w-full bg-gray-50 rounded-xl px-3 py-2.5 font-bold text-gray-700 outline-none mt-1 border border-transparent focus:border-pink-300"
+                                >
+                                    <option value="">બધા</option>
+                                    <option value="અપરિણીત">અપરિણીત</option>
+                                    <option value="વિધવા">વિધવા</option>
+                                    <option value="વિધુર">વિધુર</option>
+                                    <option value="છૂટાછેડા">છૂટાછેડા</option>
+                                </select>
+                            </div>
+
+                            {/* Gol */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 ml-1">ગોળ</label>
+                                <input 
+                                    type="text" placeholder="દા.ત. 42 ગોળ"
+                                    value={filters.gol}
+                                    onChange={(e) => setFilters({...filters, gol: e.target.value})}
+                                    className="w-full bg-gray-50 rounded-xl px-4 py-2 font-bold text-gray-700 outline-none mt-1 border border-transparent focus:border-pink-300"
+                                />
+                            </div>
+
+                            {/* District */}
+                            <div className="col-span-2">
+                                <label className="text-xs font-bold text-gray-400 ml-1">જીલ્લો</label>
+                                <input 
+                                    type="text" placeholder="દા.ત. બનાસકાંઠા"
+                                    value={filters.district}
+                                    onChange={(e) => setFilters({...filters, district: e.target.value})}
+                                    className="w-full bg-gray-50 rounded-xl px-4 py-2 font-bold text-gray-700 outline-none mt-1 border border-transparent focus:border-pink-300"
+                                />
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {loading ? <Loader2 className="animate-spin mx-auto mt-10 text-pink-500" /> : filteredProfiles.length === 0 ? (
+                <div className="text-center py-10">
+                    <Search className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                    <p className="text-gray-400 font-bold">કોઈ રિઝલ્ટ મળ્યું નથી.</p>
+                    <button onClick={() => {setSearchQuery(''); setFilters({minAge:18, maxAge:60, maritalStatus:'', gol:'', district:''})}} className="text-pink-600 text-sm font-bold mt-2">રીસેટ કરો</button>
+                </div>
+            ) : filteredProfiles.map((profile) => (
               <motion.div key={profile.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white p-4 rounded-[30px] shadow-sm border border-gray-100 flex gap-4 items-center">
                 <div className="w-20 h-20 rounded-2xl bg-pink-50 flex items-center justify-center shrink-0 border border-pink-100 overflow-hidden shadow-inner">
                   {profile.image_url ? <img src={profile.image_url} className="w-full h-full object-cover" /> : <User className="text-pink-200 w-10 h-10" />}
@@ -317,7 +476,6 @@ export default function MatrimonyScreen() {
                   <p className="text-pink-600 text-xs font-bold mt-1 bg-pink-50 w-fit px-2 py-0.5 rounded-full">{profile.age} વર્ષ | {profile.village}</p>
                   <div className="mt-2 flex gap-2">
                     <button onClick={() => { setSelectedProfile(profile); setActiveTab('detail'); }} className="bg-pink-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm active:scale-90 transition-all">વિગત</button>
-                    {/* ✅ UPDATED: Pass full profile object */}
                     <button onClick={() => handleSendRequest(profile)} className="bg-white text-pink-600 border border-pink-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm active:scale-90 transition-all">રિક્વેસ્ટ</button>
                   </div>
                 </div>
@@ -327,7 +485,6 @@ export default function MatrimonyScreen() {
         )}
 
         {activeTab === 'myprofile' && (
-            // ✅ ફેમિલી વેરીફીકેશન ચેક
             isFamilyVerified === false ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                     <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-4 animate-pulse">
@@ -346,7 +503,6 @@ export default function MatrimonyScreen() {
                     </button>
                 </div>
             ) : (
-                // જો ફેમિલીમાં હોય તો ફોર્મ ખૂલશે
                 <div className="bg-white p-6 rounded-[35px] shadow-sm border border-gray-100 space-y-6">
                       {familyData && !hasProfile && (
                           <div className="bg-green-50 p-4 rounded-xl flex items-start gap-3 border border-green-100">
@@ -354,7 +510,7 @@ export default function MatrimonyScreen() {
                               <div>
                                  <p className="text-sm text-green-800 font-bold">વેરીફાઈડ મેમ્બર ✅</p>
                                  <p className="text-xs text-green-700 mt-1">
-                                     તમારો મોબાઈલ નંબર પરિવાર લિસ્ટ સાથે મેચ થયો છે. તમારી વિગતો ઓટોમેટિક ભરાઈ ગઈ છે.
+                                      તમારો મોબાઈલ નંબર પરિવાર લિસ્ટ સાથે મેચ થયો છે. તમારી વિગતો ઓટોમેટિક ભરાઈ ગઈ છે.
                                  </p>
                              </div>
                           </div>
@@ -375,7 +531,6 @@ export default function MatrimonyScreen() {
                     <div className="space-y-4">
                     <h3 className="font-bold text-gray-800 border-b pb-2 text-lg uppercase tracking-wider">વ્યક્તિગત માહિતી</h3>
                     
-                    {/* ફોર્મ ફિલ્ડ્સ */}
                     <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">લગ્ન સ્થિતિ</label>
                         <select 
@@ -479,7 +634,6 @@ export default function MatrimonyScreen() {
             {selectedProfile ? (
               <div className="bg-white rounded-[40px] p-6 shadow-xl border border-pink-50">
                 <div className="text-center mb-6">
-                  {/* ✅ Big Photo: Vertical (3:4) & Face Center */}
                   <div className="w-full aspect-[3/4] bg-pink-50 rounded-3xl mb-6 border-4 border-white shadow-lg overflow-hidden relative">
                     <img 
                       src={selectedProfile.image_url || 'https://ui-avatars.com/api/?name=User&background=random'} 
@@ -499,14 +653,12 @@ export default function MatrimonyScreen() {
                   <DetailRow icon={GraduationCap} label="શિક્ષણ" value={selectedProfile.education} />
                   <DetailRow icon={Heart} label="ગોળ" value={selectedProfile.gol} />
                   
-                  {/* ✅ New Details Shown */}
                   <DetailRow icon={Home} label="મોસાળ ગામ" value={selectedProfile.mosal_gam} />
                   <DetailRow icon={User} label="માતાનું નામ" value={selectedProfile.mother_name} />
                   <DetailRow icon={User} label="માતાની અટક" value={selectedProfile.mother_peta_atak} />
                   {selectedProfile.nani_peta_atak && <DetailRow icon={User} label="નાનીની અટક" value={selectedProfile.nani_peta_atak} />}
                   {selectedProfile.dadi_peta_atak && <DetailRow icon={User} label="દાદીની અટક" value={selectedProfile.dadi_peta_atak} />}
                 </div>
-                {/* ✅ UPDATED: Pass full profile object */}
                 <button onClick={() => handleSendRequest(selectedProfile)} className="w-full mt-6 bg-pink-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest">રિક્વેસ્ટ મોકલો</button>
               </div>
             ) : <p className="text-center text-gray-400 font-bold mt-10">લિસ્ટમાંથી કોઈ પ્રોફાઇલ પસંદ કરો.</p>}

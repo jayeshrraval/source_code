@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Crown, Zap, ArrowLeft, Info, Heart, Loader2 } from 'lucide-react'; // Loader2 ઉમેર્યું
+import { Check, Crown, Zap, ArrowLeft, Info, Heart, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import BottomNav from '../components/BottomNav';
-import { supabase } from '../supabaseClient'; // ✅ Supabase Import
-import * as WebBrowser from 'expo-web-browser'; // ✅ Browser Import
+import { supabase } from '../supabaseClient';
+import { Browser } from '@capacitor/browser'; // ✅ Capacitor Browser Import
 
 export default function SubscriptionScreen() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false); // ✅ Loading State
+  const [loading, setLoading] = useState(false);
 
   const plans = [
     {
@@ -16,47 +15,26 @@ export default function SubscriptionScreen() {
       name: 'માસિક મેમ્બરશીપ ફી',
       nameEn: 'Monthly Membership Fee',
       price: '₹49',
-      amount: 49, // ✅ ગણતરી માટે અલગ નંબર રાખ્યો
-      period: '/મહિનો',
-      color: 'from-mint to-teal-500',
+      amount: 49,
+      color: 'bg-[#1A8FA3]',
       icon: Zap,
-      badge: null,
     },
     {
       id: 'yearly',
       name: 'વાર્ષિક મેમ્બરશીપ ફી',
       nameEn: 'Yearly Membership Fee',
       price: '₹480',
-      amount: 480, // ✅ ગણતરી માટે અલગ નંબર રાખ્યો
-      period: '/વર્ષ',
-      color: 'from-royal-gold to-yellow-600',
+      amount: 480,
+      color: 'bg-[#D4AF37]',
       icon: Crown,
       badge: 'Best Value',
       savings: '₹108 બચત',
     },
   ];
 
-  const benefits = [
-    'અમર્યાદિત પ્રોફાઈલ જોવા',
-    'Unlimited profile views',
-    'પ્રાયોરિટી સપોર્ટ',
-    'Priority customer support',
-    'એડવાન્સ સર્ચ ફિલ્ટર્સ',
-    'Advanced search filters',
-    'મેસેજ રીડ રીસીપ્ટ',
-    'Message read receipts',
-    'પ્રોફાઈલ હાઈલાઈટ',
-    'Profile highlight feature',
-    'એડ ફ્રી અનુભવ',
-    'Ad-free experience',
-  ];
-
-  // 🔥 Payment Logic Here
   const handleSubscribe = async (plan) => {
     try {
       setLoading(true);
-
-      // ૧. યુઝર લોગિન છે કે નહીં?
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         alert("પહેલા લોગિન કરો.");
@@ -64,175 +42,85 @@ export default function SubscriptionScreen() {
         return;
       }
 
-      // ૨. યુઝરનો મોબાઈલ નંબર (ડેટાબેઝ અથવા મેટાડેટામાંથી)
       const userMobile = user.user_metadata?.mobile || "9999999999";
 
-      console.log(`Starting Payment: ${plan.price} for ${userMobile}`);
-
-      // ૩. Supabase Edge Function ને કોલ કરો (Backend)
       const { data, error } = await supabase.functions.invoke('phonepe-init', {
-        body: { 
-            amount: plan.amount, // પ્લાનની રકમ (49 or 480)
-            mobileNumber: userMobile 
-        }
+        body: { amount: plan.amount, mobileNumber: userMobile }
       });
 
-      if (error) {
-        throw new Error("સર્વર કનેક્શનમાં ભૂલ છે.");
-      }
+      if (error) throw new Error("સર્વર કનેક્શનમાં ભૂલ છે.");
 
-      // ૪. જો લિંક મળે તો પેમેન્ટ પેજ ખોલો
       if (data?.success && data?.url) {
-        await WebBrowser.openBrowserAsync(data.url);
-        
-        // પેમેન્ટ કરીને પાછા આવે ત્યારે
-        if(window.confirm("શું તમે પેમેન્ટ પૂરું કર્યું?")) {
-            // અહીં તમે સ્ટેટસ ચેક કરી શકો છો
-            alert("તમારું પેમેન્ટ પ્રોસેસ થઈ રહ્યું છે. થોડી વારમાં પ્લાન એક્ટિવ થઈ જશે.");
-            navigate('/home');
-        }
+        // ✅ Capacitor માં બ્રાઉઝર ખોલવાની સાચી રીત
+        await Browser.open({ url: data.url });
       } else {
-        alert("પેમેન્ટ લિંક મળી નથી. ફરી પ્રયાસ કરો.");
+        alert("પેમેન્ટ લિંક મળી નથી.");
       }
-
     } catch (error) {
-      console.error(error);
-      alert("ભૂલ: " + error.message);
+      alert(error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-deep-blue via-[#1A8FA3] to-mint pb-24">
+    <div className="min-h-screen bg-[#002B45] text-white pb-20">
       {/* Header */}
-      <div className="safe-area-top px-6 py-8 text-center relative">
+      <div className="flex flex-col items-center p-8 relative">
         <button 
-            onClick={() => navigate(-1)} 
-            className="absolute top-8 left-6 p-2 bg-white/20 rounded-full text-white"
+          onClick={() => navigate(-1)} 
+          className="absolute top-8 left-6 p-2 bg-white/10 rounded-full"
         >
-            <ArrowLeft className="w-6 h-6" />
+          <ArrowLeft size={24} />
         </button>
-
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="inline-block mb-4"
-        >
-          <div className="w-20 h-20 rounded-full bg-royal-gold/20 flex items-center justify-center mx-auto">
-            <Heart className="w-10 h-10 text-royal-gold fill-royal-gold" />
-          </div>
-        </motion.div>
-        <h1 className="text-white font-gujarati font-bold text-3xl mb-2">મેમ્બરશીપ ફી</h1>
-        <p className="text-white/80 text-sm">સમાજનું ઉત્થાન, આપણી જવાબદારી</p>
+        <div className="w-20 h-20 rounded-full bg-[#D4AF37]/20 flex items-center justify-center mb-4">
+          <Heart color="#D4AF37" fill="#D4AF37" size={40} />
+        </div>
+        <h1 className="text-2xl font-bold">મેમ્બરશીપ ફી</h1>
+        <p className="text-white/60 text-sm">સમાજનું ઉત્થાન, આપણી જવાબદારી</p>
       </div>
 
-      <div className="px-6 space-y-6">
-        
-        {/* 🚨 THE MANDATORY MESSAGE BOX */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white/95 backdrop-blur-sm border-l-8 border-yellow-500 p-5 rounded-2xl shadow-2xl"
-        >
-          <div className="flex items-start gap-4">
-            <div className="bg-yellow-100 p-2 rounded-full shrink-0">
-                <Info className="text-yellow-700 w-6 h-6" />
+      {/* Message Box */}
+      <div className="mx-6 p-4 bg-[#FFF3CD] rounded-xl flex gap-3 border-l-4 border-[#FFEEBA]">
+        <Info className="text-[#856404] shrink-0" size={20} />
+        <p className="text-[#856404] text-sm font-bold leading-tight">
+          "આ એપ સમાજ માટે મફત છે, પણ સમાજના વિકાસ માટે દરેક સભ્યે સ્વૈચ્છિક ફાળો અથવા લવાજમ આપવું ફરજિયાત છે."
+        </p>
+      </div>
+
+      {/* Plans */}
+      <div className="p-6 space-y-4">
+        {plans.map((plan) => (
+          <div key={plan.id} className="bg-white rounded-3xl p-6 shadow-xl overflow-hidden relative">
+            {plan.badge && (
+              <div className="absolute top-3 right-3 bg-[#D4AF37] text-white text-[10px] px-2 py-1 rounded-full font-bold uppercase">
+                {plan.badge}
+              </div>
+            )}
+            <div className="flex items-center gap-4 mb-4">
+              <div className={`w-12 h-12 rounded-xl ${plan.color} flex items-center justify-center text-white shadow-lg`}>
+                <plan.icon size={24} />
+              </div>
+              <div>
+                <h3 className="text-gray-800 font-bold text-lg leading-none">{plan.name}</h3>
+                <p className="text-gray-500 text-xs mt-1">{plan.nameEn}</p>
+              </div>
             </div>
-            <p className="text-gray-800 font-bold leading-relaxed text-[15px] font-gujarati">
-              "આ એપ સમાજ માટે મફત છે, પણ સમાજના વિકાસ માટે દરેક સભ્યે સ્વૈચ્છિક ફાળો (Voluntary Donation) અથવા લવાજમ (Membership Fee) આપવું ફરજિયાત છે."
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Plan Cards */}
-        {plans.map((plan, index) => {
-          const Icon = plan.icon;
-          return (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.2 }}
-              className="premium-card p-6 relative overflow-hidden bg-white rounded-3xl shadow-lg"
+            <div className="mb-4">
+              <span className="text-3xl font-black text-[#002B45]">{plan.price}</span>
+              <span className="text-gray-500 text-sm">/પ્લાન</span>
+              {plan.savings && <p className="text-green-600 text-xs font-bold mt-1">{plan.savings}</p>}
+            </div>
+            <button 
+              onClick={() => handleSubscribe(plan)}
+              disabled={loading}
+              className={`w-full py-4 rounded-2xl ${plan.color} text-white font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
             >
-              {plan.badge && (
-                <div className="absolute top-4 right-4 bg-gradient-to-r from-royal-gold to-yellow-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-gold">
-                  {plan.badge}
-                </div>
-              )}
-
-              <div className="flex items-start space-x-4 mb-6">
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${plan.color} flex items-center justify-center shadow-lg flex-shrink-0`}>
-                  <Icon className="w-8 h-8 text-white" strokeWidth={2} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-gujarati font-bold text-xl text-gray-800 mb-1">
-                    {plan.name}
-                  </h3>
-                  <p className="text-sm text-gray-600">{plan.nameEn}</p>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <div className="flex items-baseline space-x-2">
-                  <span className="text-4xl font-bold text-deep-blue">{plan.price}</span>
-                  <span className="text-gray-600 font-gujarati">{plan.period}</span>
-                </div>
-                {plan.savings && (
-                  <p className="text-green-600 text-sm font-gujarati font-semibold mt-2">
-                    {plan.savings}
-                  </p>
-                )}
-              </div>
-
-              <button 
-                onClick={() => handleSubscribe(plan)}
-                disabled={loading}
-                className={`w-full bg-gradient-to-r ${plan.color} text-white font-gujarati font-semibold py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2`}
-              >
-                {loading ? (
-                    <>
-                        <Loader2 className="animate-spin w-5 h-5" /> પ્રોસેસ થાય છે...
-                    </>
-                ) : "સભ્યપદ મેળવો"}
-              </button>
-            </motion.div>
-          );
-        })}
-
-        {/* Benefits Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="premium-card p-6 bg-white rounded-3xl"
-        >
-          <h3 className="font-gujarati font-bold text-xl text-gray-800 mb-6 text-center border-b pb-2">
-             સભ્યપદના લાભો
-          </h3>
-          <div className="space-y-4">
-            {benefits.map((benefit, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 + index * 0.05 }}
-                className="flex items-start space-x-3"
-              >
-                <div className="w-6 h-6 rounded-full bg-mint/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Check className="w-4 h-4 text-deep-blue" strokeWidth={3} />
-                </div>
-                <p className={`text-gray-700 ${index % 2 === 0 ? 'font-gujarati font-medium' : 'text-sm'}`}>
-                  {benefit}
-                </p>
-              </motion.div>
-            ))}
+              {loading ? <Loader2 className="animate-spin" size={20} /> : "સભ્યપદ મેળવો"}
+            </button>
           </div>
-        </motion.div>
+        ))}
       </div>
-
-      <BottomNav />
     </div>
   );
 }
