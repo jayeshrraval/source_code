@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Heart, Loader2, User, MapPin, Briefcase, GraduationCap, Camera, Bell, ArrowLeft, Users, Lock, CheckCircle, Home, Filter, X } from 'lucide-react';
+import { Search, Heart, Loader2, User, MapPin, Briefcase, GraduationCap, Camera, Bell, ArrowLeft, Users, Lock, CheckCircle, Home, Filter, X, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
@@ -27,7 +27,7 @@ export default function MatrimonyScreen() {
   const [filters, setFilters] = useState({
     minAge: 18,
     maxAge: 60,
-    maritalStatus: '',
+    maritalStatus: '', // Empty means 'બધા' (All)
     gol: '',
     district: ''
   });
@@ -394,13 +394,33 @@ export default function MatrimonyScreen() {
                     >
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-gray-700 text-sm uppercase tracking-wide">Advance Filters</h3>
-                            <button onClick={() => setShowFilters(false)}><X className="text-gray-400 w-5 h-5" /></button>
+                            <div className="flex items-center gap-2">
+                                {/* ✅ CLEAR FILTER BUTTON */}
+                                <button 
+                                    onClick={() => {
+                                        setFilters({ minAge: 18, maxAge: 60, maritalStatus: '', gol: '', district: '' });
+                                        setSearchQuery('');
+                                    }}
+                                    className="flex items-center gap-1 text-[10px] font-bold text-pink-600 bg-pink-50 px-3 py-1.5 rounded-full active:scale-95 transition-all"
+                                >
+                                    <RotateCcw size={12} /> Clear
+                                </button>
+                                <button onClick={() => setShowFilters(false)}><X className="text-gray-400 w-5 h-5" /></button>
+                            </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4">
                             {/* Age Range */}
                             <div className="col-span-2">
-                                <label className="text-xs font-bold text-gray-400 ml-1">ઉંમર (વર્ષ)</label>
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-bold text-gray-400 ml-1">ઉંમર (વર્ષ)</label>
+                                    <button 
+                                        onClick={() => setFilters({...filters, minAge: 18, maxAge: 100})}
+                                        className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded cursor-pointer"
+                                    >
+                                        બધા (All)
+                                    </button>
+                                </div>
                                 <div className="flex gap-4 items-center mt-1">
                                     <input 
                                         type="number" placeholder="Min" 
@@ -426,7 +446,7 @@ export default function MatrimonyScreen() {
                                     onChange={(e) => setFilters({...filters, maritalStatus: e.target.value})}
                                     className="w-full bg-gray-50 rounded-xl px-3 py-2.5 font-bold text-gray-700 outline-none mt-1 border border-transparent focus:border-pink-300"
                                 >
-                                    <option value="">બધા</option>
+                                    <option value="">બધા (All)</option>
                                     <option value="અપરિણીત">અપરિણીત</option>
                                     <option value="વિધવા">વિધવા</option>
                                     <option value="વિધુર">વિધુર</option>
@@ -436,7 +456,15 @@ export default function MatrimonyScreen() {
 
                             {/* Gol */}
                             <div>
-                                <label className="text-xs font-bold text-gray-400 ml-1">ગોળ</label>
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-bold text-gray-400 ml-1">ગોળ</label>
+                                    <button 
+                                        onClick={() => setFilters({...filters, gol: ''})}
+                                        className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded cursor-pointer"
+                                    >
+                                        બધા
+                                    </button>
+                                </div>
                                 <input 
                                     type="text" placeholder="દા.ત. 42 ગોળ"
                                     value={filters.gol}
@@ -447,7 +475,15 @@ export default function MatrimonyScreen() {
 
                             {/* District */}
                             <div className="col-span-2">
-                                <label className="text-xs font-bold text-gray-400 ml-1">જીલ્લો</label>
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-bold text-gray-400 ml-1">જીલ્લો</label>
+                                    <button 
+                                        onClick={() => setFilters({...filters, district: ''})}
+                                        className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded cursor-pointer"
+                                    >
+                                        બધા
+                                    </button>
+                                </div>
                                 <input 
                                     type="text" placeholder="દા.ત. બનાસકાંઠા"
                                     value={filters.district}
@@ -484,6 +520,7 @@ export default function MatrimonyScreen() {
           </div>
         )}
 
+        {/* ... (બાકીનો 'myprofile' અને 'detail' કોડ જેમ હતો તેમ જ છે) ... */}
         {activeTab === 'myprofile' && (
             isFamilyVerified === false ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">

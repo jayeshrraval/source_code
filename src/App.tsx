@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 
+// Screens Imports
 import SplashScreen from './screens/SplashScreen';
 import LoginScreen from "./screens/LoginScreen";
 import HomeScreen from './screens/HomeScreen';
@@ -31,6 +32,10 @@ import SettingsScreen from './screens/SettingsScreen';
 import AboutScreen from './screens/AboutScreen'; 
 import MessagesScreen from './screens/MessagesScreen';
 
+// ✅ આ ૨ નવી સ્ક્રીન ઉમેરી (જે તમે બનાવવાના છો)
+import StudentRegistration from './screens/StudentRegistration';
+import MarriageRegistration from './screens/MarriageRegistration';
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,16 +49,14 @@ export default function App() {
         console.error("Capgo error:", error);
       }
 
-      // 🔥 AdMob સેટઅપ (Real ID સાથે)
+      // 🔥 AdMob સેટઅપ
       try {
         await AdMob.initialize({
           requestTrackingAuthorization: true,
         });
 
         await AdMob.showBanner({
-          // ✅ તમારો અસલી Ad Unit ID અહી નાખ્યો છે:
           adId: 'ca-app-pub-2459932160741563/8195857584', 
-
           adSize: BannerAdSize.BANNER,
           position: BannerAdPosition.BOTTOM_CENTER, 
           margin: 0, 
@@ -61,7 +64,6 @@ export default function App() {
       } catch (e) {
         console.error('AdMob Error:', e);
       }
-      // 🔥 AdMob સેટઅપ પૂરું
 
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       setSession(currentSession);
@@ -87,7 +89,7 @@ export default function App() {
     return <SplashScreen />;
   }
 
-  const ProtectedRoute = ({ children }) => {
+  const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     if (!session) {
       return <Navigate to="/" replace />;
     }
@@ -130,6 +132,11 @@ export default function App() {
         <Route path="/profile" element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
         <Route path="/about" element={<ProtectedRoute><AboutScreen /></ProtectedRoute>} />
+
+        {/* ✅ આ બે નવી લાઈન ઉમેરી દીધી છે */}
+        <Route path="/student-registration" element={<ProtectedRoute><StudentRegistration /></ProtectedRoute>} />
+        <Route path="/marriage-registration" element={<ProtectedRoute><MarriageRegistration /></ProtectedRoute>} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
