@@ -2,32 +2,44 @@
   "name": "yogi-samaj-sambandh",
   "private": true,
   "version": "1.0.0",
-  "main": "node_modules/expo/AppEntry.js",
+  "type": "module",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "expo": "~54.0.30",
-    "expo-status-bar": "~2.1.0",
-    "expo-web-browser": "~15.0.10",
-    "react": "19.1.0",
-    "react-native": "0.83.1",
-    "@supabase/supabase-js": "^2.47.10",
-    "lucide-react-native": "^0.468.0",
-    "zustand": "^4.5.5",
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/haptics": "^6.0.0",
+    "@capacitor/keyboard": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0",
+    "@supabase/supabase-js": "^2.89.0",
+    "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.0",
-    "framer-motion": "^11.15.0",
+    "emoji-picker-react": "^4.16.1",
+    "framer-motion": "^11.18.2",
+    "i18next": "^23.16.8",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "lucide-react": "^0.468.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-i18next": "^14.1.3",
+    "react-router-dom": "^6.30.2",
     "zod": "^3.23.8",
-    "react-i18next": "^14.1.0",
-    "i18next": "^23.16.0"
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.2",
+    "@capacitor/cli": "^8.0.0",
     "@types/react": "~19.1.10",
+    "@types/react-dom": "~19.1.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
     "typescript": "~5.9.2",
-    "eas-cli": "^14.1.0"
+    "vite": "^6.0.5"
   }
 }
