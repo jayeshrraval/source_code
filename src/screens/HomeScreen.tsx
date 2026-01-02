@@ -14,16 +14,16 @@ const NOTIFICATION_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869
 export default function HomeScreen() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState('Yogi Member');
-  const [userPhoto, setUserPhoto] = useState<string | null>(null);
+  const [userPhoto, setUserPhoto] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showNotificationPopup, setShowNotificationPopup] = useState(false); // ✅ પોપઅપ સ્ટેટ
 
   // ✅ ઓડિયો પ્લેયર રેફરન્સ
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef(null);
 
   // ✅ ભાષા લોડ કરો (નવું લોજિક)
   const language = localStorage.getItem('app_language') || 'Gujarati';
-  const t = (gu: string, en: string) => language === 'English' ? en : gu;
+  const t = (gu, en) => language === 'English' ? en : gu;
 
   // ✅ સ્ટેટ્સ: એપ યુઝર્સ અને મેટ્રિમોની પ્રોફાઈલ માટે
   const [statsData, setStatsData] = useState({
