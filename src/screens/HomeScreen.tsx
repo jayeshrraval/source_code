@@ -141,7 +141,7 @@ export default function HomeScreen() {
     { icon: GraduationCap, title: t('શિક્ષણ અને ભવિષ્ય', 'Education & Future'), color: 'from-indigo-400 to-purple-500', path: '/education' },
     { icon: Briefcase, title: t('નોકરીની જાહેરાત', 'Job Ads'), color: 'from-blue-600 to-indigo-600', path: '/jobs' },
     { icon: MessageCircle, title: t('મેટ્રીમોની ચેટ', 'Matrimony Chat'), color: 'from-blue-400 to-cyan-500', path: '/messages' },
-    { icon: CreditCard, title: t('મેમ્બરશીપ ફી', 'Membership Fee'), color: 'from-royal-gold to-yellow-600', path: '/subscription' },
+    { icon: CreditCard, title: t('સમાજ વિકાસ ફાળો', 'Membership Fee'), color: 'from-royal-gold to-yellow-600', path: '/subscription' },
     { icon: Building2, title: t('યોગી સમાજ ટ્રસ્ટ', 'Yogi Samaj Trust'), color: 'from-emerald-400 to-green-500', path: '/trust' },
     { icon: Bot, title: t('જ્ઞાન સહાયક', 'AI Assistant'), color: 'from-violet-400 to-purple-500', path: '/ai-assistant' },
   ];

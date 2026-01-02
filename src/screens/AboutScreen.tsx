@@ -46,14 +46,27 @@ export default function AboutScreen() {
         {activeTab === 'about' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex flex-col items-center py-8 bg-white rounded-3xl shadow-sm border border-gray-100">
-               <img 
-                 src="/icon-192x192.png" 
-                 alt="App Icon" 
-                 className="w-20 h-20 rounded-2xl shadow-lg mb-4 object-cover"
-                 onError={(e) => { e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E🙏%3C/text%3E%3C/svg%3E"; }}
-               />
-               <h2 className="text-xl font-bold text-gray-800">યોગી સમાજ સંબંધ</h2>
-               <p className="text-gray-400 text-sm">Version 1.0.0</p>
+                
+                {/* ✅ નવો લોગો અહીંયા અપડેટ કર્યો છે */}
+                <div className="flex justify-center items-center mb-6">
+                    <a 
+                      href="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj02tGMctD7dOcizJfzCDJ5RCzIWo9apjlz-pueOsYK8QHb9R76VwQ9hAGiFLyWXuowPhDZd1795uHtvYCRgUgRKhkn9HUHRB3yzLblPyEjZeMjzz8TzyINinutpXdbNh84KWTImWkiMdYBdIHg55ERSl3iasTuZzFDwZ84wq76BWxSWxGUudmpBHI4JpNq/s1024/icon.png" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-[#075e54]/20 shadow-xl">
+                            <img 
+                              alt="Yogi Samaj Logo" 
+                              src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj02tGMctD7dOcizJfzCDJ5RCzIWo9apjlz-pueOsYK8QHb9R76VwQ9hAGiFLyWXuowPhDZd1795uHtvYCRgUgRKhkn9HUHRB3yzLblPyEjZeMjzz8TzyINinutpXdbNh84KWTImWkiMdYBdIHg55ERSl3iasTuZzFDwZ84wq76BWxSWxGUudmpBHI4JpNq/s320/icon.png" 
+                              className="w-full h-full object-cover scale-110"
+                            />
+                        </div>
+                    </a>
+                </div>
+
+                <h2 className="text-xl font-bold text-gray-800">યોગી સમાજ સંબંધ</h2>
+                <p className="text-gray-400 text-sm">Version 1.0.0</p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
@@ -95,7 +108,7 @@ export default function AboutScreen() {
           </div>
         )}
 
-        {/* ✅ Final Professional Footer */}
+        {/* Final Professional Footer */}
         <div className="mt-16 text-center space-y-2 border-t pt-6">
             <p className="text-[10px] text-gray-400 font-bold flex items-center justify-center gap-1 uppercase tracking-widest">
               Developed with <Heart size={10} className="text-red-500 fill-red-500" /> by Raval Yogi Samaj Team

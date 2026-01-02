@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Loader2, HandHeart, ShieldCheck, ScrollText, GraduationCap, Users } from 'lucide-react';
+import { ArrowLeft, Heart, Loader2, HandHeart, ShieldCheck, ScrollText, GraduationCap, Users, AlertTriangle, Info } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { Browser } from '@capacitor/browser';
 
@@ -51,7 +51,6 @@ export default function SubscriptionScreen() {
         return;
       }
 
-      // 🔴 તમારી વેબસાઈટની લિંક (Blogger Page)
       const paymentPageUrl = "https://yogisamajsambandh.blogspot.com/p/blog-page.html";
       const fullUrl = `${paymentPageUrl}?phone=${userMobile}&amt=${plan.amount}`;
 
@@ -65,7 +64,7 @@ export default function SubscriptionScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-[#002B45] text-white pb-20">
+    <div className="min-h-screen bg-[#002B45] text-white pb-24">
       
       {/* Header */}
       <div className="flex flex-col items-center p-8 relative">
@@ -75,19 +74,17 @@ export default function SubscriptionScreen() {
         >
           <ArrowLeft size={24} />
         </button>
-        <div className="w-20 h-20 rounded-full bg-[#D4AF37]/20 flex items-center justify-center mb-4">
-          <HandHeart color="#D4AF37" fill="#D4AF37" size={40} />
+        
+        <div className="w-32 h-32 rounded-full bg-white mb-4 border-4 border-[#D4AF37] shadow-2xl overflow-hidden flex items-center justify-center">
+            <img 
+               src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj02tGMctD7dOcizJfzCDJ5RCzIWo9apjlz-pueOsYK8QHb9R76VwQ9hAGiFLyWXuowPhDZd1795uHtvYCRgUgRKhkn9HUHRB3yzLblPyEjZeMjzz8TzyINinutpXdbNh84KWTImWkiMdYBdIHg55ERSl3iasTuZzFDwZ84wq76BWxSWxGUudmpBHI4JpNq/s320/icon.png" 
+               alt="Yogi Samaj Logo"
+               className="w-full h-full object-cover scale-110"
+            />
         </div>
-        <h1 className="text-2xl font-bold">સમાજ વિકાસ ફાળો</h1>
-        <p className="text-white/60 text-sm">તમારું યોગદાન, સમાજની પ્રગતિ</p>
-      </div>
 
-      {/* ✅ Google Policy Safe Message */}
-      <div className="mx-6 p-4 bg-[#e8f5e9] rounded-xl flex gap-3 border-l-4 border-[#2e7d32] mb-6">
-        <ShieldCheck className="text-[#1b5e20] shrink-0" size={24} />
-        <p className="text-[#1b5e20] text-sm font-bold leading-tight">
-          "આ એપ સમાજ માટે મફત છે. આ રકમ એપના મેન્ટેનન્સ અને સમાજ સેવા માટે 'સ્વૈચ્છિક ફાળો' (Voluntary Donation) છે."
-        </p>
+        <h1 className="text-2xl font-bold mt-2">સમાજ વિકાસ ફાળો</h1>
+        <p className="text-white/60 text-sm">તમારું યોગદાન, સમાજની પ્રગતિ</p>
       </div>
 
       {/* Plans */}
@@ -126,40 +123,67 @@ export default function SubscriptionScreen() {
         ))}
       </div>
 
-      {/* ✅ NEW: Professional Note Section */}
+      {/* ✅ નિયમો અને શરતો Section */}
       <div className="mx-4 bg-white/5 rounded-2xl p-6 border border-white/10">
-        <div className="flex items-center gap-3 mb-4 border-b border-white/10 pb-3">
+        <div className="flex items-center gap-3 mb-5 border-b border-white/10 pb-3">
           <ScrollText className="text-[#D4AF37]" size={24} />
-          <h3 className="text-lg font-bold text-[#D4AF37]">મહત્વની નોંધ</h3>
+          <h3 className="text-lg font-bold text-white">નિયમો અને શરતો</h3>
         </div>
 
-        <div className="space-y-4">
-          {/* Point 1: App Maintenance */}
+        <div className="space-y-6">
+          
+          {/* ૧. ફાળાની વહેંચણી */}
           <div className="flex gap-3">
-            <div className="mt-1 bg-blue-500/20 p-1.5 rounded-lg h-fit">
-              <Users size={16} className="text-blue-300" />
+            <div className="mt-1 bg-blue-500/20 p-1.5 rounded-lg h-fit shrink-0">
+              <Info size={16} className="text-blue-300" />
             </div>
-            <p className="text-sm text-gray-300 leading-relaxed">
-              તમે જે ફાળો આપશો તેનો ઉપયોગ <b className="text-white">સમાજના વિકાસ</b> માટે અને આપણી આ <b className="text-white">એપના મેન્ટેનન્સ ખર્ચ</b> પેટે વાપરવામાં આવશે.
-            </p>
+            <div>
+              <h4 className="text-sm font-bold text-white mb-1">૧. ફાળાની વહેંચણી (Funds Allocation):</h4>
+              <p className="text-xs text-gray-300 leading-relaxed text-justify">
+                યુઝર દ્વારા આપવામાં આવેલા કુલ ફાળાના <b className="text-white">૩૦% રકમ</b> આ ડિજિટલ પ્લેટફોર્મ (એપ) ના સર્વર ખર્ચ, મેન્ટેનન્સ, સિક્યુરિટી અને નવા અપડેટ્સ માટે વાપરવામાં આવશે. બાકીના <b className="text-white">૭૦% રકમ</b> સીધી સમાજના કલ્યાણકારી કાર્યો (સ્કોલરશીપ, સમૂહ લગ્ન, ઇનામ વિતરણ, સહાય અને બીજા સામાજિક વિકાસ) માટે સુરક્ષિત રાખવામાં આવશે.
+              </p>
+            </div>
           </div>
 
-          {/* Point 2: Scholarship & Help */}
+          {/* ૨. સહાયની મર્યાદા */}
           <div className="flex gap-3">
-            <div className="mt-1 bg-green-500/20 p-1.5 rounded-lg h-fit">
-              <GraduationCap size={16} className="text-green-300" />
+            <div className="mt-1 bg-yellow-500/20 p-1.5 rounded-lg h-fit shrink-0">
+              <AlertTriangle size={16} className="text-yellow-300" />
             </div>
-            <p className="text-sm text-gray-300 leading-relaxed">
-              આ ફાળાથી આપણે સમાજના તેજસ્વી વિદ્યાર્થીઓ માટે <b className="text-white">સ્કોલરશીપ યોજના</b> બનાવી શકીશું અને આર્થિક રીતે નબળા વિદ્યાર્થીઓને મદદ કરી શકીશું.
-            </p>
+            <div>
+              <h4 className="text-sm font-bold text-white mb-1">૨. સહાયની મર્યાદા (Fund Availability):</h4>
+              <p className="text-xs text-gray-300 leading-relaxed text-justify">
+                સમાજની વિવિધ યોજનાઓ જેવી કે અકસ્માત સહાય કે સ્કોલરશીપનો લાભ સંપૂર્ણપણે ભેગા થયેલા ફંડની ઉપલબ્ધતા પર આધારિત છે. જો ફંડ પૂરતું નહીં હોય, તો સહાય આપી શકાશે નહીં. કોઈપણ સંજોગોમાં સહાય આપવી કે નહીં તેનો આખરી નિર્ણય ટ્રસ્ટ/એડમિનનો રહેશે.
+              </p>
+            </div>
           </div>
 
-          {/* Point 3: Final Appeal */}
-          <div className="bg-[#D4AF37]/10 p-4 rounded-xl mt-2 border border-[#D4AF37]/30">
-            <p className="text-sm text-[#FFE58F] font-medium text-center leading-relaxed">
-              "માસિક ₹49 કે વાર્ષિક ₹480 આપણા માટે વધારે નથી, પણ બધાના સહયોગથી સમાજ માટે ઘણું મોટું કાર્ય થઈ શકે છે. તો આપણી ફરજ સમજીને અવશ્ય ફાળો આપીએ." 🙏
-            </p>
+          {/* ૩. કોઈ ગેરંટી કે હકદાવો નહીં */}
+          <div className="flex gap-3">
+            <div className="mt-1 bg-red-500/20 p-1.5 rounded-lg h-fit shrink-0">
+              <ShieldCheck size={16} className="text-red-300" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white mb-1">૩. કોઈ ગેરંટી કે હકદાવો નહીં (No Claims):</h4>
+              <p className="text-xs text-gray-300 leading-relaxed text-justify">
+                આ ફાળો એક <b className="text-white">'સ્વૈચ્છિક દાન'</b> છે, કોઈ વીમો (Insurance) નથી. ફાળો આપ્યા બાદ કોઈપણ સભ્ય એવો કાયદેસરનો હકદાવો (Claim) નહીં કરી શકે કે તેણે પૈસા આપ્યા છે એટલે તેને સહાય મળવી જ જોઈએ. સહાય માત્ર જરૂરિયાત અને ફંડની સ્થિતિ જોઈને જ નક્કી કરવામાં આવશે.
+              </p>
+            </div>
           </div>
+
+          {/* ૪. સામૂહિક નૈતિક જવાબદારી */}
+          <div className="flex gap-3">
+            <div className="mt-1 bg-green-500/20 p-1.5 rounded-lg h-fit shrink-0">
+              <Users size={16} className="text-green-300" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white mb-1">૪. સામૂહિક નૈતિક જવાબદારી:</h4>
+              <p className="text-xs text-gray-300 leading-relaxed text-justify">
+                આ એપ અને તેની યોજનાઓ સમાજના દરેક સભ્યોના નાના-નાના સહયોગથી ચાલે છે. જો સભ્યો ફાળો આપવાનું બંધ કરશે, તો ફંડના અભાવે આ સુવિધાઓ અને યોજનાઓ કોઈપણ પૂર્વ સૂચના વગર બંધ થઈ શકે છે.
+              </p>
+            </div>
+          </div>
+
         </div>
       </div>
 
