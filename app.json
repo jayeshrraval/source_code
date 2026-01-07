@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Yogi Samaj Sambandh",
+    "slug": "yogi-samaj-sambandh",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.yogisamaj.sambandh",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "36bf99ae-2879-4cff-9075-26fe244e0ddf"
+      }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
+  }
+}

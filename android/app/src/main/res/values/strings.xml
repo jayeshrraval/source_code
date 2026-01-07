@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">યોગી સમાજ સંબંધ</string>
+    <string name="title_activity_main">Yogi Samaj Sambandh</string>
+    <string name="package_name">com.yogisamajsambandh.app</string>
+    <string name="custom_url_scheme">com.yogisamajsambandh.app</string>
+</resources>
