@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   Bell, Settings, Heart, Search, MessageCircle, User, CreditCard,
   Building2, Bot, Users, GraduationCap, AlertTriangle, Briefcase, X,
-  Store // ✅ નવું આઈકોન ઈમ્પોર્ટ કર્યું
+  Store, Megaphone // ✅ 1. અહીં Megaphone આઈકોન ઉમેર્યો
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,6 +18,9 @@ export default function HomeScreen() {
   const [userPhoto, setUserPhoto] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showNotificationPopup, setShowNotificationPopup] = useState(false); // ✅ પોપઅપ સ્ટેટ
+  
+  // ✅ 2. નવું સ્ટેટ: ન્યૂઝ માટે Red Dot (લાલ ટપકું)
+  const [hasUnreadNews, setHasUnreadNews] = useState(false);
 
   // ✅ ઓડિયો પ્લેયર રેફરન્સ
   const audioRef = useRef(null);
@@ -36,6 +39,7 @@ export default function HomeScreen() {
   // --- Real-time Logic (Fixes Applied) ---
   useEffect(() => {
     fetchDashboardData();
+    checkUnreadMessages(); // ✅ 3. ન્યૂઝ ચેક કરવાનું ફંક્શન કોલ કર્યું
     
     // ✅ ઓડિયો ઓબ્જેક્ટ તૈયાર કરો
     audioRef.current = new Audio(NOTIFICATION_SOUND_URL);
@@ -90,6 +94,30 @@ export default function HomeScreen() {
     };
   }, []);
 
+  // ✅ 4. નવું ફંક્શન: Red Dot માટે ચેકિંગ
+  const checkUnreadMessages = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // છેલ્લો મેસેજ શોધો
+      const { data: lastMsg } = await supabase.from('admin_messages').select('created_at').order('created_at', { ascending: false }).limit(1).single();
+      if (!lastMsg) return;
+
+      // યુઝરે ક્યારે જોયું તે શોધો
+      const { data: readStatus } = await supabase.from('message_reads').select('last_read_at').eq('user_id', user.id).single();
+
+      // જો નવો મેસેજ હોય તો લાલ ટપકું બતાવો
+      if (!readStatus || new Date(lastMsg.created_at) > new Date(readStatus.last_read_at)) {
+        setHasUnreadNews(true);
+      } else {
+        setHasUnreadNews(false);
+      }
+    } catch (error) {
+       console.log("News check error", error);
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -135,8 +163,15 @@ export default function HomeScreen() {
     }
   };
 
-  // ✅ અપડેટ: અહીં નવું 'વ્યાપાર સેતુ' કાર્ડ ઉમેર્યું છે
+  // ✅ 5. અહીં નવું 'સમાજ ન્યૂઝ' કાર્ડ ઉમેર્યું છે
   const featureCards = [
+    { 
+      icon: Megaphone, // નવો આઈકોન
+      title: t('સમાજ ન્યૂઝ', 'Samaj News'), 
+      color: 'from-red-500 to-pink-600', 
+      path: '/notice-board',
+      isNews: true // આના પરથી Red Dot ઓળખીશું
+    },
     { icon: Heart, title: t('મેટ્રિમોની પ્રોફાઈલ', 'Matrimony Profiles'), color: 'from-pink-400 to-rose-500', path: '/matrimony' },
     { icon: Users, title: t('પરિવાર રજીસ્ટ્રેશન', 'Family Registration'), color: 'from-deep-blue to-cyan-500', path: '/family-list' },
     
@@ -266,8 +301,13 @@ export default function HomeScreen() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 }}
                 onClick={() => navigate(card.path)}
-                className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-start hover:shadow-md active:scale-95 transition-all group"
+                className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-start hover:shadow-md active:scale-95 transition-all group relative" // relative ઉમેર્યું
               >
+                {/* ✅ 6. Red Dot દેખાડવા માટેનું લોજિક */}
+                {card.isNews && hasUnreadNews && (
+                   <span className="absolute top-3 right-3 w-3 h-3 bg-red-600 rounded-full border-2 border-white animate-pulse shadow-sm z-10"></span>
+                )}
+
                 <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-4 shadow-lg group-hover:rotate-6 transition-transform`}>
                   <Icon className="w-6 h-6 text-white" strokeWidth={2.5} />
                 </div>

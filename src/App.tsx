@@ -39,6 +39,7 @@ import StudentRegistration from './screens/StudentRegistration';
 import MarriageRegistration from './screens/MarriageRegistration';
 import BusinessDirectoryScreen from './screens/BusinessDirectoryScreen';
 import BusinessDetailsScreen from './screens/BusinessDetailsScreen';
+import NoticeBoardScreen from './screens/NoticeBoardScreen';
 
 // ✅ MainLayout: દરેક પેજ પર એડ માટે જગ્યા રાખશે
 const MainLayout = ({ children }) => {
@@ -174,6 +175,7 @@ export default function App() {
           <Route path="/marriage-registration" element={<ProtectedRoute><MarriageRegistration /></ProtectedRoute>} />
           <Route path="/business-directory" element={<BusinessDirectoryScreen />} />
           <Route path="/business-details/:id" element={<BusinessDetailsScreen />} />
+          <Route path="/notice-board" element={<NoticeBoardScreen />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
